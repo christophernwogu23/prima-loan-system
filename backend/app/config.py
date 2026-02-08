@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
-from typing import List
+from typing import List, Optional
 
 class Settings(BaseSettings):
     APP_NAME: str = "PRIMA - Loan Management System"
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     DB_NAME: str = "loan_management"
     
     # Optional: Direct DATABASE_URL for Render deployment
-    DATABASE_URL: str = None
+    DATABASE_URL: str | None = None
     
     @property
     def database_url(self) -> str:
@@ -39,7 +39,10 @@ class Settings(BaseSettings):
     def cors_origins(self) -> List[str]:
         """Dynamic CORS origins based on environment"""
         if self.ENVIRONMENT == "production":
-            return [self.FRONTEND_URL]
+            return [
+                self.FRONTEND_URL,
+                "https://prima-loan-system.vercel.app"
+            ]
         else:
             # Development - allow multiple localhost ports
             return [
@@ -48,6 +51,13 @@ class Settings(BaseSettings):
                 "http://127.0.0.1:5173",
                 self.FRONTEND_URL
             ]
+
+    @property
+    def cors_origin_regex(self) -> str | None:
+        """Regex pattern for Vercel preview deployments"""
+        if self.ENVIRONMENT == "production":
+            return r"https://.*\.vercel\.app"
+        return None
     
     class Config:
         env_file = ".env"
