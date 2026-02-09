@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from app.config import settings
 
 print("=== SERVER STARTED ===")
@@ -13,14 +14,21 @@ app = FastAPI(
     debug=settings.DEBUG
 )
 
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
 # CORS Configuration - Dynamic based on environment
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_kwargs = {
+    "allow_origins": settings.cors_origins,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+
+# Add regex for Vercel preview deployments in production
+if settings.cors_origin_regex:
+    cors_kwargs["allow_origin_regex"] = settings.cors_origin_regex
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 # Compress responses
 app.add_middleware(GZipMiddleware, minimum_size=1000)
