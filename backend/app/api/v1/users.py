@@ -326,3 +326,41 @@ async def sync_officers_from_loans(
     
     return {"updated": updated, "message": f"{updated} customers updated from loan records"}
 
+@router.delete("/{user_id}")
+async def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a user"""
+    # Only admin can delete users
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Prevent deleting yourself
+    if current_user.id == user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    
+    # Check if user exists
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Optional: Check if user has active loans (safety check)
+    if user.role == "customer":
+        active_loans = db.query(LoanApplication).filter(
+            LoanApplication.customer_id == user_id,
+            LoanApplication.status.in_(["pending", "under_review", "approved", "disbursed"])
+        ).count()
+        
+        if active_loans > 0:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot delete user with {active_loans} active loan(s). Close or reject loans first."
+            )
+    
+    # Delete the user
+    db.delete(user)
+    db.commit()
+    
+    return {"message": "User deleted successfully", "deleted_user_id": user_id}
