@@ -42,10 +42,6 @@ const loadUsers = async () => {
   }
 }
 
-// Update the useEffect to trigger on search changes:
-useEffect(() => {
-  loadUsers()
-}, [filterRole, searchQuery])
 
 // Optional: Add debouncing to avoid too many API calls
 useEffect(() => {
