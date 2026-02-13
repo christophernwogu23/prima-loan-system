@@ -43,3 +43,8 @@ export const getDisbursedLoans = async () => {
   const { data } = await client.get('/payments/disbursed-loans')
   return data
 }
+
+export const getPaymentSummary = async (loanId) => {
+  const { data } = await client.get(`/payments/summary/${loanId}`)
+  return data
+}
