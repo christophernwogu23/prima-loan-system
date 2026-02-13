@@ -5,13 +5,13 @@ import { getUsers, createUser, deleteUser } from '../api/users'
 import toast from 'react-hot-toast'
 import { Trash2, Plus, X, Eye, Edit2, PlusCircle, Search } from 'lucide-react'
 import UserDetailsModal from '../components/UserDetailsModal'
-import api from '../api/axios'
+import api from '../api/client'
 import ApplyForCustomerModal from '../components/ApplyForCustomerModal'
+import client from '../api/client'
 
 export default function Users() {
   const { user: currentUser } = useAuthStore()
   const [users, setUsers] = useState([])
-  const [filteredUsers, setFilteredUsers] = useState([])
   const [selectedUserId, setSelectedUserId] = useState(null)
   const [editingUser, setEditingUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -29,28 +29,22 @@ export default function Users() {
     role: 'customer'
   })
 
-const loadUsers = async () => {
-  try {
-    const data = await getUsers(filterRole || null, null, searchQuery || null)
-    setUsers(data)
-    setFilteredUsers(data)
-  } catch (error) {
-    console.error('Failed to load users:', error)
-    toast.error('Failed to load users')
-  } finally {
-    setLoading(false)
-  }
-}
+  // Load users with debouncing
+  useEffect(() => {
+    const delaySearch = setTimeout(async () => {
+      try {
+        const data = await getUsers(filterRole || null, null, searchQuery || null)
+        setUsers(data)
+      } catch (error) {
+        console.error('Failed to load users:', error)
+        toast.error('Failed to load users')
+      } finally {
+        setLoading(false)
+      }
+    }, 500)
 
-
-// Optional: Add debouncing to avoid too many API calls
-useEffect(() => {
-  const delaySearch = setTimeout(() => {
-    loadUsers()
-  }, 500) // Wait 500ms after user stops typing
-
-  return () => clearTimeout(delaySearch)
-}, [searchQuery, filterRole])
+    return () => clearTimeout(delaySearch)
+  }, [searchQuery, filterRole])
 
   const handleCreateUser = async (e) => {
     e.preventDefault()
@@ -59,7 +53,9 @@ useEffect(() => {
       toast.success('User created successfully!')
       setShowModal(false)
       setFormData({ email: '', password: '', first_name: '', middle_name: '', last_name: '', role: 'customer' })
-      loadUsers()
+      // Reload users
+      const data = await getUsers(filterRole || null, null, searchQuery || null)
+      setUsers(data)
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to create user')
     }
@@ -71,7 +67,9 @@ useEffect(() => {
     try {
       await deleteUser(userId)
       toast.success('User deleted')
-      loadUsers()
+      // Reload users
+      const data = await getUsers(filterRole || null, null, searchQuery || null)
+      setUsers(data)
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to delete user')
     }
@@ -88,17 +86,18 @@ useEffect(() => {
         role: formData.role
       }
       
-      // Only include password if it was changed
       if (formData.password) {
         updateData.password = formData.password
       }
       
-      await api.put(`/users/${editingUser.id}`, updateData)
+      await client.put(`/users/${editingUser.id}`, updateData)
       toast.success('User updated successfully!')
       setShowModal(false)
       setEditingUser(null)
       setFormData({ email: '', password: '', first_name: '', middle_name: '', last_name: '', role: 'customer' })
-      loadUsers()
+      // Reload users
+      const data = await getUsers(filterRole || null, null, searchQuery || null)
+      setUsers(data)
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to update user')
     }
@@ -133,7 +132,6 @@ useEffect(() => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold dark:text-white">Users</h2>
         <div className="flex gap-4">
-          {/* Add User Button - Admin only */}
           {currentUser?.role === 'admin' && (
             <button
               onClick={() => setShowModal(true)}
@@ -148,7 +146,6 @@ useEffect(() => {
 
       {/* Search and Filter Bar */}
       <div className="flex gap-4 mb-6 flex-wrap">
-        {/* Search Input */}
         <div className="flex-1 min-w-[300px] relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
           <input
@@ -168,7 +165,6 @@ useEffect(() => {
           )}
         </div>
 
-        {/* Role Filter */}
         <select
           value={filterRole}
           onChange={(e) => setFilterRole(e.target.value)}
@@ -183,16 +179,15 @@ useEffect(() => {
         </select>
       </div>
 
-      {/* Results Count */}
       {searchQuery && (
         <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-          Found {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'}
+          Found {users.length} {users.length === 1 ? 'user' : 'users'}
         </div>
       )}
 
       {loading ? (
         <p className="dark:text-white">Loading...</p>
-      ) : filteredUsers.length === 0 ? (
+      ) : users.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-8 text-center">
           <p className="text-gray-500 dark:text-gray-400">
             {searchQuery ? 'No users found matching your search.' : 'No users found.'}
@@ -212,7 +207,7 @@ useEffect(() => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredUsers.map((user) => (
+              {users.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                   <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                     {user.first_name} {user.middle_name ? user.middle_name + ' ' : ''}{user.last_name}
@@ -333,7 +328,6 @@ useEffect(() => {
                 </div>
               </div>
 
-              {/* Middle Name Field */}
               <div>
                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">
                   Middle Name <span className="text-gray-400 dark:text-gray-500 font-normal">(optional)</span>
@@ -403,7 +397,6 @@ useEffect(() => {
         />
       )}
 
-      {/* Apply for Customer Modal */}
       {applyingForCustomer && (
         <ApplyForCustomerModal
           customer={applyingForCustomer}

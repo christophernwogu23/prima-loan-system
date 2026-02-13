@@ -31,7 +31,7 @@ async def get_notifications(
                     "type": "application_approved",
                     "title": "Application Update",
                     "message": f"Your application {app.application_number} has been {app.status.replace('_', ' ')}",
-                    "date": app.updated_at,
+                    "date": app.created_at,  # CHANGED from updated_at
                     "read": False
                 })
             elif app.status == "rejected":
@@ -40,7 +40,7 @@ async def get_notifications(
                     "type": "application_rejected",
                     "title": "Application Rejected",
                     "message": f"Your application {app.application_number} was rejected",
-                    "date": app.updated_at,
+                    "date": app.created_at,  # CHANGED from updated_at
                     "read": False
                 })
         
@@ -82,7 +82,7 @@ async def get_notifications(
         # Manager notifications
         pending = db.query(LoanApplication).filter(
             LoanApplication.status.in_(["officer_approved", "officer_rejected"])
-        ).order_by(LoanApplication.updated_at.desc()).all()
+        ).order_by(LoanApplication.created_at.desc()).all()  # CHANGED from updated_at
         
         for app in pending:
             notifications.append({
@@ -90,7 +90,7 @@ async def get_notifications(
                 "type": "review_needed",
                 "title": "Review Needed",
                 "message": f"Application {app.application_number} awaiting manager review",
-                "date": app.updated_at,
+                "date": app.created_at,  # CHANGED from updated_at
                 "read": False
             })
     
@@ -106,7 +106,7 @@ async def get_notifications(
                 "type": "review_needed",
                 "title": "Final Approval Needed",
                 "message": f"Application {app.application_number} awaiting CEO approval",
-                "date": app.updated_at,
+                "date": app.created_at,  # CHANGED from updated_at
                 "read": False
             })
     
@@ -149,3 +149,11 @@ async def trigger_payment_reminders(
         "message": f"Generated {count} payment reminders",
         "count": count
     }
+
+@router.post("/mark-all-read")
+async def mark_all_as_read(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Mark all notifications as read (placeholder for future implementation)"""
+    return {"message": "All notifications marked as read"}
