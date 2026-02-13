@@ -44,6 +44,7 @@ class UserUpdate(BaseModel):
 async def get_users(
     role: Optional[str] = None,
     officer_id: Optional[int] = Query(None, description="Filter customers by loan officer (for managers/CEO/admin)"),
+    search: Optional[str] = Query(None, description="Search by name or email"),  # NEW
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -55,6 +56,17 @@ async def get_users(
             User.assigned_officer_id == current_user.id,
             User.role == "customer"
         )
+        
+        # Apply search if provided
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                (User.first_name.ilike(search_term)) |
+                (User.last_name.ilike(search_term)) |
+                (User.middle_name.ilike(search_term)) |
+                (User.email.ilike(search_term))
+            )
+        
         return query.all()
     
     # Only admin, ceo, manager can view all users or filter by officer
@@ -70,6 +82,16 @@ async def get_users(
     # Filter by role if specified
     if role:
         query = query.filter(User.role == role)
+    
+    # Apply search if provided
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            (User.first_name.ilike(search_term)) |
+            (User.last_name.ilike(search_term)) |
+            (User.middle_name.ilike(search_term)) |
+            (User.email.ilike(search_term))
+        )
     
     return query.all()
 

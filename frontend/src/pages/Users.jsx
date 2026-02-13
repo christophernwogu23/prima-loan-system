@@ -3,7 +3,7 @@ import Layout from '../components/Layout'
 import { useAuthStore } from '../store/authStore'
 import { getUsers, createUser, deleteUser } from '../api/users'
 import toast from 'react-hot-toast'
-import { Trash2, Plus, X, Eye, Edit2, PlusCircle } from 'lucide-react'
+import { Trash2, Plus, X, Eye, Edit2, PlusCircle, Search } from 'lucide-react'
 import UserDetailsModal from '../components/UserDetailsModal'
 import api from '../api/axios'
 import ApplyForCustomerModal from '../components/ApplyForCustomerModal'
@@ -11,12 +11,14 @@ import ApplyForCustomerModal from '../components/ApplyForCustomerModal'
 export default function Users() {
   const { user: currentUser } = useAuthStore()
   const [users, setUsers] = useState([])
+  const [filteredUsers, setFilteredUsers] = useState([])
   const [selectedUserId, setSelectedUserId] = useState(null)
   const [editingUser, setEditingUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [applyingForCustomer, setApplyingForCustomer] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [filterRole, setFilterRole] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   
   const [formData, setFormData] = useState({
     email: '',
@@ -27,21 +29,32 @@ export default function Users() {
     role: 'customer'
   })
 
-  useEffect(() => {
-    loadUsers()
-  }, [filterRole])
-
-  const loadUsers = async () => {
-    try {
-      const data = await getUsers(filterRole || null)
-      setUsers(data)
-    } catch (error) {
-      console.error('Failed to load users:', error)
-      toast.error('Failed to load users')
-    } finally {
-      setLoading(false)
-    }
+const loadUsers = async () => {
+  try {
+    const data = await getUsers(filterRole || null, null, searchQuery || null)
+    setUsers(data)
+    setFilteredUsers(data)
+  } catch (error) {
+    console.error('Failed to load users:', error)
+    toast.error('Failed to load users')
+  } finally {
+    setLoading(false)
   }
+}
+
+// Update the useEffect to trigger on search changes:
+useEffect(() => {
+  loadUsers()
+}, [filterRole, searchQuery])
+
+// Optional: Add debouncing to avoid too many API calls
+useEffect(() => {
+  const delaySearch = setTimeout(() => {
+    loadUsers()
+  }, 500) // Wait 500ms after user stops typing
+
+  return () => clearTimeout(delaySearch)
+}, [searchQuery, filterRole])
 
   const handleCreateUser = async (e) => {
     e.preventDefault()
@@ -95,6 +108,10 @@ export default function Users() {
     }
   }
 
+  const handleClearSearch = () => {
+    setSearchQuery('')
+  }
+
   const getRoleColor = (role) => {
     const colors = {
       admin: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
@@ -120,20 +137,6 @@ export default function Users() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold dark:text-white">Users</h2>
         <div className="flex gap-4">
-          {/* Filter */}
-          <select
-            value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value)}
-            className="px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All Roles</option>
-            <option value="admin">Admin</option>
-            <option value="ceo">CEO</option>
-            <option value="manager">Manager</option>
-            <option value="loan_officer">Loan Officer</option>
-            <option value="customer">Customer</option>
-          </select>
-          
           {/* Add User Button - Admin only */}
           {currentUser?.role === 'admin' && (
             <button
@@ -147,8 +150,58 @@ export default function Users() {
         </div>
       </div>
 
+      {/* Search and Filter Bar */}
+      <div className="flex gap-4 mb-6 flex-wrap">
+        {/* Search Input */}
+        <div className="flex-1 min-w-[300px] relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
+          <input
+            type="text"
+            placeholder="Search by name or email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {searchQuery && (
+            <button
+              onClick={handleClearSearch}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+
+        {/* Role Filter */}
+        <select
+          value={filterRole}
+          onChange={(e) => setFilterRole(e.target.value)}
+          className="px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">All Roles</option>
+          <option value="admin">Admin</option>
+          <option value="ceo">CEO</option>
+          <option value="manager">Manager</option>
+          <option value="loan_officer">Loan Officer</option>
+          <option value="customer">Customer</option>
+        </select>
+      </div>
+
+      {/* Results Count */}
+      {searchQuery && (
+        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          Found {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'}
+        </div>
+      )}
+
       {loading ? (
         <p className="dark:text-white">Loading...</p>
+      ) : filteredUsers.length === 0 ? (
+        <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-8 text-center">
+          <p className="text-gray-500 dark:text-gray-400">
+            {searchQuery ? 'No users found matching your search.' : 'No users found.'}
+          </p>
+        </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl overflow-hidden">
           <table className="w-full">
@@ -163,7 +216,7 @@ export default function Users() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {users.map((user) => (
+              {filteredUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                   <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                     {user.first_name} {user.middle_name ? user.middle_name + ' ' : ''}{user.last_name}

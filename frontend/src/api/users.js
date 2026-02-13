@@ -1,9 +1,10 @@
 import client from './client'
 
-export const getUsers = async (role = null, officerId = null) => {
+export const getUsers = async (role = null, officerId = null, search = null) => {
   const params = []
   if (role) params.push(`role=${role}`)
   if (officerId) params.push(`officer_id=${officerId}`)
+  if (search) params.push(`search=${encodeURIComponent(search)}`)  // NEW
   
   let url = '/users/'
   if (params.length > 0) {
