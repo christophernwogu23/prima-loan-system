@@ -1,10 +1,15 @@
 import client from './client'
 
-export const getApplications = async (month = null) => {
+export const getApplications = async (month = null, officerId = null) => {
+  const params = []
+  if (month) params.push(`month=${month}`)
+  if (officerId) params.push(`officer_id=${officerId}`)
+  
   let url = '/applications/'
-  if (month) {
-    url += `?month=${month}`
+  if (params.length > 0) {
+    url += `?${params.join('&')}`
   }
+  
   const { data } = await client.get(url)
   return data
 }
@@ -26,5 +31,10 @@ export const updateApplication = async (applicationId, updateData) => {
 
 export const reviewApplication = async (id, reviewData) => {
   const { data } = await client.post(`/applications/${id}/review`, reviewData)
+  return data
+}
+
+export const getUserApplications = async (userId) => {
+  const { data } = await client.get(`/applications/user/${userId}`)
   return data
 }

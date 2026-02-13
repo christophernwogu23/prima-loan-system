@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel, EmailStr
@@ -7,7 +7,6 @@ from app.api.deps import get_db, get_current_user
 from app.models import User
 from app.core.security import get_password_hash
 from sqlalchemy import func
-from datetime import datetime
 from app.models.loan_application import LoanApplication
 from app.models.payment import Payment
 
@@ -20,7 +19,8 @@ class UserResponse(BaseModel):
     last_name: str
     role: str
     status: str
-    approval_limit: Optional[float] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
     assigned_officer_id: Optional[int] = None
     created_at: datetime
     
@@ -39,28 +39,35 @@ class UserUpdate(BaseModel):
     last_name: Optional[str] = None
     role: Optional[str] = None
     status: Optional[str] = None
-    approval_limit: Optional[float] = None
 
 @router.get("/", response_model=List[UserResponse])
 async def get_users(
     role: Optional[str] = None,
+    officer_id: Optional[int] = Query(None, description="Filter customers by loan officer (for managers/CEO/admin)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """Get users with role-based filtering"""
+    
     # Loan officers can only see their assigned customers
     if current_user.role == "loan_officer":
         query = db.query(User).filter(
-            User.role == "customer",
-            User.assigned_officer_id == current_user.id
+            User.assigned_officer_id == current_user.id,
+            User.role == "customer"
         )
         return query.all()
     
-    # Only admin, ceo, manager can view all users
+    # Only admin, ceo, manager can view all users or filter by officer
     if current_user.role not in ["admin", "ceo", "manager"]:
         raise HTTPException(status_code=403, detail="Access denied")
     
     query = db.query(User)
     
+    # Filter by specific loan officer (for managers/CEO/admin)
+    if officer_id:
+        query = query.filter(User.assigned_officer_id == officer_id)
+    
+    # Filter by role if specified
     if role:
         query = query.filter(User.role == role)
     
@@ -76,6 +83,11 @@ async def get_user_financial_summary(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # Loan officers can only view their assigned customers
+    if current_user.role == "loan_officer":
+        if user.assigned_officer_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Access denied - customer not assigned to you")
     
     # Get all loans for this customer
     loans = db.query(LoanApplication).filter(
@@ -96,7 +108,6 @@ async def get_user_financial_summary(
     ).scalar() or 0
     
     # Calculate risk score (0-20 scale)
-    # Factors: payment history, defaults, outstanding balance
     risk_score = 18.0  # Default good score
     
     # Check for defaults
@@ -114,7 +125,7 @@ async def get_user_financial_summary(
             
             if days_since > 30:
                 defaults_count += 1
-                risk_score -= 3  # Reduce score for each default
+                risk_score -= 3
     
     # Check repayment ratio
     if total_borrowed > 0:
@@ -126,7 +137,7 @@ async def get_user_financial_summary(
     
     # Check number of loans
     if len(loans) > 5:
-        risk_score -= 1  # Slight penalty for too many loans
+        risk_score -= 1
     
     # Ensure score is within bounds
     risk_score = max(0, min(20, risk_score))
@@ -148,6 +159,7 @@ async def get_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """Get a single user by ID"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -155,6 +167,11 @@ async def get_user(
     # Customers can only view themselves
     if current_user.role == "customer" and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Loan officers can only view their assigned customers
+    if current_user.role == "loan_officer":
+        if user.role == "customer" and user.assigned_officer_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Access denied - customer not assigned to you")
     
     return user
 
@@ -164,6 +181,7 @@ async def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """Create a new user"""
     # Only admin can create users
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admin can create users")
@@ -193,38 +211,6 @@ async def create_user(
     
     return user
 
-@router.patch("/{user_id}", response_model=UserResponse)
-async def update_user(
-    user_id: int,
-    user_data: UserUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    # Only admin can update users, or users can update themselves
-    if current_user.role != "admin" and current_user.id != user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Update fields
-    if user_data.first_name:
-        user.first_name = user_data.first_name
-    if user_data.last_name:
-        user.last_name = user_data.last_name
-    if user_data.role and current_user.role == "admin":
-        user.role = user_data.role
-    if user_data.status and current_user.role == "admin":
-        user.status = user_data.status
-    if user_data.approval_limit is not None and current_user.role == "admin":
-        user.approval_limit = user_data.approval_limit
-    
-    db.commit()
-    db.refresh(user)
-    
-    return user
-
 @router.put("/{user_id}")
 async def update_user(
     user_id: int,
@@ -233,8 +219,7 @@ async def update_user(
     current_user: User = Depends(get_current_user)
 ):
     """Update a user"""
-    print(f"=== UPDATE USER ===")
-    print(f"Current user: {current_user.email}, Role: {current_user.role}")
+    # Only admin can update users
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
@@ -242,6 +227,7 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # Update fields
     if "first_name" in user_data:
         user.first_name = user_data["first_name"]
     if "last_name" in user_data:
@@ -250,13 +236,16 @@ async def update_user(
         user.email = user_data["email"]
     if "role" in user_data:
         user.role = user_data["role"]
+    if "status" in user_data:
+        user.status = user_data["status"]
+    if "assigned_officer_id" in user_data:
+        user.assigned_officer_id = user_data["assigned_officer_id"]
     if "password" in user_data and user_data["password"]:
         user.hashed_password = get_password_hash(user_data["password"])
     
     db.commit()
     db.refresh(user)
     return user
-
 
 @router.put("/{user_id}/assign-officer")
 async def assign_officer(
@@ -308,8 +297,6 @@ async def sync_officers_from_loans(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    from app.models.loan_application import LoanApplication
-    
     # Get all loans with assigned officers
     loans = db.query(LoanApplication).filter(
         LoanApplication.assigned_officer_id.isnot(None)
@@ -341,12 +328,11 @@ async def delete_user(
     if current_user.id == user_id:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
     
-    # Check if user exists
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Optional: Check if user has active loans (safety check)
+    # Check if user has active loans
     if user.role == "customer":
         active_loans = db.query(LoanApplication).filter(
             LoanApplication.customer_id == user_id,
@@ -359,7 +345,6 @@ async def delete_user(
                 detail=f"Cannot delete user with {active_loans} active loan(s). Close or reject loans first."
             )
     
-    # Delete the user
     db.delete(user)
     db.commit()
     

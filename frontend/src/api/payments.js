@@ -1,10 +1,15 @@
 import client from './client'
 
-export const getPayments = async (month = null) => {
+export const getPayments = async (month = null, officerId = null) => {
+  const params = []
+  if (month) params.push(`month=${month}`)
+  if (officerId) params.push(`officer_id=${officerId}`)
+  
   let url = '/payments/'
-  if (month) {
-    url += `?month=${month}`
+  if (params.length > 0) {
+    url += `?${params.join('&')}`
   }
+  
   const { data } = await client.get(url)
   return data
 }
@@ -14,8 +19,8 @@ export const createPayment = async (paymentData) => {
   return data
 }
 
-export const updatePayment = async (paymentId, paymentData) => {
-  const { data } = await client.put(`/payments/${paymentId}`, paymentData)
+export const updatePayment = async (paymentId, updateData) => {
+  const { data } = await client.put(`/payments/${paymentId}`, updateData)
   return data
 }
 
@@ -29,7 +34,7 @@ export const getLoanPayments = async (loanId) => {
   return data
 }
 
-export const getPaymentSummary = async (loanId) => {
+export const getLoanPaymentSummary = async (loanId) => {
   const { data } = await client.get(`/payments/summary/${loanId}`)
   return data
 }
