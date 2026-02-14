@@ -44,7 +44,6 @@ async def export_report(
 ):
     """Export different types of reports"""
     
-    # Only management can export
     if current_user.role not in ["manager", "ceo", "admin"]:
         raise HTTPException(status_code=403, detail="Access denied")
     
@@ -70,7 +69,6 @@ async def export_report(
         raise HTTPException(status_code=400, detail="Invalid report type")
 
 def generate_balance_sheet(db: Session, start_date: Optional[str], end_date: Optional[str]):
-    """Balance Sheet"""
     wb = Workbook()
     ws = wb.active
     ws.title = "Balance Sheet"
@@ -155,7 +153,6 @@ def generate_balance_sheet(db: Session, start_date: Optional[str], end_date: Opt
     return create_download_response(wb, "Balance_Sheet")
 
 def generate_profit_loss(db: Session, start_date: Optional[str], end_date: Optional[str]):
-    """Profit & Loss"""
     wb = Workbook()
     ws = wb.active
     ws.title = "Profit & Loss"
@@ -241,7 +238,6 @@ def generate_profit_loss(db: Session, start_date: Optional[str], end_date: Optio
     return create_download_response(wb, "Profit_Loss")
 
 def generate_interest_report(db: Session, start_date: Optional[str], end_date: Optional[str]):
-    """Interest Report"""
     wb = Workbook()
     ws = wb.active
     ws.title = "Interest"
@@ -299,7 +295,6 @@ def generate_interest_report(db: Session, start_date: Optional[str], end_date: O
     return create_download_response(wb, "Interest")
 
 def generate_upfront_report(db: Session, start_date: Optional[str], end_date: Optional[str]):
-    """Upfront Charges"""
     wb = Workbook()
     ws = wb.active
     ws.title = "Upfront"
@@ -361,7 +356,6 @@ def generate_upfront_report(db: Session, start_date: Optional[str], end_date: Op
     return create_download_response(wb, "Upfront")
 
 def generate_loan_disbursement(db: Session, start_date: Optional[str], end_date: Optional[str]):
-    """Loan Disbursements"""
     wb = Workbook()
     ws = wb.active
     ws.title = "Disbursements"
@@ -418,7 +412,7 @@ def generate_loan_disbursement(db: Session, start_date: Optional[str], end_date:
     return create_download_response(wb, "Disbursements")
 
 def generate_fixed_deposit_report(db: Session, start_date: Optional[str], end_date: Optional[str]):
-    """Fixed Deposits"""
+    """Fixed Deposits - Using correct field names"""
     wb = Workbook()
     ws = wb.active
     ws.title = "Fixed Deposits"
@@ -426,7 +420,7 @@ def generate_fixed_deposit_report(db: Session, start_date: Optional[str], end_da
     ws['A1'] = 'PRIMA - FIXED DEPOSITS'
     ws['A1'].font = Font(bold=True, size=14)
     
-    headers = ['Customer', 'Amount', 'Rate', 'Start', 'Maturity']
+    headers = ['Depositor', 'Amount', 'Interest', 'Value Date', 'Maturity', 'Duration', 'Status']
     for col_num, header in enumerate(headers, 1):
         cell = ws.cell(row=3, column=col_num, value=header)
         cell.font = Font(color="FFFFFF", bold=True)
@@ -434,41 +428,43 @@ def generate_fixed_deposit_report(db: Session, start_date: Optional[str], end_da
     
     deposits_query = db.query(FixedDeposit)
     if start_date:
-        deposits_query = deposits_query.filter(FixedDeposit.start_date >= start_date)
+        deposits_query = deposits_query.filter(FixedDeposit.value_date >= start_date)
     if end_date:
-        deposits_query = deposits_query.filter(FixedDeposit.start_date <= end_date)
+        deposits_query = deposits_query.filter(FixedDeposit.value_date <= end_date)
     
     deposits = deposits_query.all()
     
     row = 4
-    total = 0
+    total_amount = 0
+    total_interest = 0
     
     for deposit in deposits:
-        customer = db.query(User).filter(User.id == deposit.customer_id).first()
-        customer_name = f"{customer.first_name} {customer.last_name}" if customer else "N/A"
-        
-        ws[f'A{row}'] = customer_name
+        ws[f'A{row}'] = deposit.depositor_name
         ws[f'B{row}'] = f'₦{deposit.amount:,.2f}'
-        ws[f'C{row}'] = f'{deposit.interest_rate}%'
-        ws[f'D{row}'] = deposit.start_date.strftime("%Y-%m-%d") if deposit.start_date else "N/A"
+        ws[f'C{row}'] = f'₦{deposit.interest_amount:,.2f}'
+        ws[f'D{row}'] = deposit.value_date.strftime("%Y-%m-%d") if deposit.value_date else "N/A"
         ws[f'E{row}'] = deposit.maturity_date.strftime("%Y-%m-%d") if deposit.maturity_date else "N/A"
+        ws[f'F{row}'] = deposit.duration or "N/A"
+        ws[f'G{row}'] = deposit.status or "Active"
         
-        total += deposit.amount
+        total_amount += deposit.amount
+        total_interest += deposit.interest_amount
         row += 1
     
     row += 1
-    ws[f'A{row}'] = 'TOTAL'
+    ws[f'A{row}'] = 'TOTALS'
     ws[f'A{row}'].font = Font(bold=True)
-    ws[f'B{row}'] = f'₦{total:,.2f}'
+    ws[f'B{row}'] = f'₦{total_amount:,.2f}'
     ws[f'B{row}'].font = Font(bold=True)
+    ws[f'C{row}'] = f'₦{total_interest:,.2f}'
+    ws[f'C{row}'].font = Font(bold=True)
     
-    for col in ['A', 'B', 'C', 'D', 'E']:
-        ws.column_dimensions[col].width = 20
+    for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G']:
+        ws.column_dimensions[col].width = 18
     
     return create_download_response(wb, "Fixed_Deposits")
 
 def generate_fixed_assets_report(db: Session, start_date: Optional[str], end_date: Optional[str]):
-    """Fixed Assets"""
     wb = Workbook()
     ws = wb.active
     ws.title = "Fixed Assets"
@@ -522,7 +518,7 @@ def generate_fixed_assets_report(db: Session, start_date: Optional[str], end_dat
     return create_download_response(wb, "Fixed_Assets")
 
 def generate_savings_report(db: Session, start_date: Optional[str], end_date: Optional[str]):
-    """Savings"""
+    """Savings - Using correct field names"""
     wb = Workbook()
     ws = wb.active
     ws.title = "Savings"
@@ -530,7 +526,7 @@ def generate_savings_report(db: Session, start_date: Optional[str], end_date: Op
     ws['A1'] = 'PRIMA - SAVINGS ACCOUNTS'
     ws['A1'].font = Font(bold=True, size=14)
     
-    headers = ['Customer', 'Account', 'Balance', 'Last Update']
+    headers = ['Customer', 'Balance', 'Last Update']
     for col_num, header in enumerate(headers, 1):
         cell = ws.cell(row=3, column=col_num, value=header)
         cell.font = Font(color="FFFFFF", bold=True)
@@ -546,26 +542,24 @@ def generate_savings_report(db: Session, start_date: Optional[str], end_date: Op
         customer_name = f"{customer.first_name} {customer.last_name}" if customer else "N/A"
         
         ws[f'A{row}'] = customer_name
-        ws[f'B{row}'] = saving.account_number or "N/A"
-        ws[f'C{row}'] = f'₦{saving.balance:,.2f}'
-        ws[f'D{row}'] = saving.updated_at.strftime("%Y-%m-%d") if saving.updated_at else "N/A"
+        ws[f'B{row}'] = f'₦{saving.balance:,.2f}'
+        ws[f'C{row}'] = saving.updated_at.strftime("%Y-%m-%d") if saving.updated_at else "N/A"
         
         total += saving.balance
         row += 1
     
     row += 1
-    ws[f'B{row}'] = 'TOTAL'
+    ws[f'A{row}'] = 'TOTAL'
+    ws[f'A{row}'].font = Font(bold=True)
+    ws[f'B{row}'] = f'₦{total:,.2f}'
     ws[f'B{row}'].font = Font(bold=True)
-    ws[f'C{row}'] = f'₦{total:,.2f}'
-    ws[f'C{row}'].font = Font(bold=True)
     
-    for col in ['A', 'B', 'C', 'D']:
+    for col in ['A', 'B', 'C']:
         ws.column_dimensions[col].width = 20
     
     return create_download_response(wb, "Savings")
 
 def generate_shares_report(db: Session, start_date: Optional[str], end_date: Optional[str]):
-    """Shares"""
     wb = Workbook()
     ws = wb.active
     ws.title = "Shares"
