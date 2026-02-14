@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
 import { getPayments, createPayment, updatePayment, deletePayment, getDisbursedLoans, getPaymentSummary } from '../api/payments'
-import { DollarSign, Plus, X, CreditCard, Building, Banknote, Smartphone, Eye, Edit2, Trash2 } from 'lucide-react'
+import { DollarSign, Plus, X, CreditCard, Building, Banknote, Smartphone, Wallet, Eye, Edit2, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
 
