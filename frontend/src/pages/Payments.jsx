@@ -9,7 +9,8 @@ const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash', icon: Banknote },
   { value: 'bank_transfer', label: 'Bank Transfer', icon: Building },
   { value: 'cheque', label: 'Cheque', icon: CreditCard },
-  { value: 'mobile_money', label: 'Mobile Money', icon: Smartphone }
+  { value: 'mobile_money', label: 'Mobile Money', icon: Smartphone },
+  { value: 'savings_account', label: 'Savings Account', icon: Wallet } 
 ]
 
 export default function Payments() {
@@ -424,6 +425,13 @@ export default function Payments() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {selectedLoan && formData.payment_method === 'savings_account' && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded-lg text-sm">
+                      <p className="text-yellow-800 dark:text-yellow-300">
+                        <strong>Note:</strong> Payment will be deducted from customer's savings account.
+                      </p>
+                    </div>
+                  )}
                   Amount *
                 </label>
                 <input

@@ -35,6 +35,26 @@ def create_payment(
         if loan.assigned_officer_id != current_user.id:
             raise HTTPException(status_code=403, detail="Access denied - loan not assigned to you")
     
+    # If payment method is savings_account, verify and deduct from savings
+    if payment.payment_method == "savings_account":
+        from app.models.savings import Savings
+        
+        # Get customer's savings account
+        savings = db.query(Savings).filter(Savings.user_id == loan.customer_id).first()
+        
+        if not savings:
+            raise HTTPException(status_code=400, detail="Customer has no savings account")
+        
+        if savings.balance < payment.amount:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Insufficient savings balance. Available: ₦{savings.balance:,.2f}"
+            )
+        
+        # Deduct from savings
+        savings.balance -= payment.amount
+        db.add(savings)
+    
     # Create payment
     db_payment = Payment(
         loan_application_id=payment.loan_application_id,
@@ -50,6 +70,7 @@ def create_payment(
     db.refresh(db_payment)
     
     return db_payment
+    
 
 @router.get("/", response_model=List[PaymentWithDetails])
 def get_payments(
