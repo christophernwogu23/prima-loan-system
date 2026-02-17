@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore'
 import { getUsers, createUser, deleteUser, updateUser } from '../api/users'
 import toast from 'react-hot-toast'
 import { Trash2, Plus, X, Eye, Edit2, Search } from 'lucide-react'
+import UserDetailsModal from '../components/UserDetailsModal'
 
 export default function Users() {
   const { user: currentUser } = useAuthStore()
@@ -11,6 +12,7 @@ export default function Users() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
+  const [selectedUserId, setSelectedUserId] = useState(null)  // NEW
   const [filterRole, setFilterRole] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   
@@ -157,9 +159,7 @@ export default function Users() {
                 <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase">Role</th>
                 <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase">Joined</th>
-                {currentUser?.role === 'admin' && (
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase">Actions</th>
-                )}
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-300 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -182,37 +182,48 @@ export default function Users() {
                   <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
                     {new Date(user.created_at).toLocaleDateString()}
                   </td>
-                  {currentUser?.role === 'admin' && (
-                    <td className="px-6 py-4">
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => {
-                            setEditingUser(user)
-                            setFormData({
-                              email: user.email,
-                              password: '',
-                              first_name: user.first_name,
-                              middle_name: user.middle_name || '',
-                              last_name: user.last_name,
-                              role: user.role
-                            })
-                            setShowModal(true)
-                          }}
-                          className="text-yellow-600 hover:text-yellow-800"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        {user.id !== currentUser.id && (
+                  <td className="px-6 py-4">
+                    <div className="flex gap-3">
+                      {/* VIEW BUTTON - ADDED BACK */}
+                      <button
+                        onClick={() => setSelectedUserId(user.id)}
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                        title="View Details"
+                      >
+                        <Eye size={18} />
+                      </button>
+                      
+                      {currentUser?.role === 'admin' && (
+                        <>
                           <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="text-red-600 hover:text-red-800"
+                            onClick={() => {
+                              setEditingUser(user)
+                              setFormData({
+                                email: user.email,
+                                password: '',
+                                first_name: user.first_name,
+                                middle_name: user.middle_name || '',
+                                last_name: user.last_name,
+                                role: user.role
+                              })
+                              setShowModal(true)
+                            }}
+                            className="text-yellow-600 hover:text-yellow-800"
                           >
-                            <Trash2 size={18} />
+                            <Edit2 size={18} />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  )}
+                          {user.id !== currentUser.id && (
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -220,6 +231,7 @@ export default function Users() {
         </div>
       )}
 
+      {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
@@ -321,6 +333,14 @@ export default function Users() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* User Details Modal */}
+      {selectedUserId && (
+        <UserDetailsModal
+          userId={selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+        />
       )}
     </Layout>
   )
