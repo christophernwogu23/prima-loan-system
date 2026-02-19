@@ -26,6 +26,7 @@ export default function Payments() {
   const [selectedLoan, setSelectedLoan] = useState(null)
   const [loanSummary, setLoanSummary] = useState(null)
   const [loanSearchQuery, setLoanSearchQuery] = useState('')
+  const [paymentSearchQuery, setPaymentSearchQuery] = useState('')  // NEW - for main page search
   const [updating, setUpdating] = useState(false)
   const [deleting, setDeleting] = useState(false)
   
@@ -109,7 +110,7 @@ export default function Payments() {
         loan_application_id: parseInt(formData.loan_application_id),
         amount: parseFloat(formData.amount)
       })
-      toast.success('Payment recorded successfully')
+      toast.success('Payment recorded!')
       setShowModal(false)
       setFormData({
         loan_application_id: '',
@@ -198,6 +199,7 @@ export default function Payments() {
     return methodObj ? methodObj.icon : DollarSign
   }
 
+  // Filter loans for the modal dropdown
   const filteredLoans = disbursedLoans.filter(loan => {
     if (!loanSearchQuery) return true
     const searchLower = loanSearchQuery.toLowerCase()
@@ -205,6 +207,18 @@ export default function Payments() {
       loan.customer_name.toLowerCase().includes(searchLower) ||
       loan.product_name.toLowerCase().includes(searchLower) ||
       loan.id.toString().includes(searchLower)
+    )
+  })
+
+  // Filter payments for the main table
+  const filteredPayments = payments.filter(payment => {
+    if (!paymentSearchQuery) return true
+    const searchLower = paymentSearchQuery.toLowerCase()
+    return (
+      payment.customer_name?.toLowerCase().includes(searchLower) ||
+      payment.loan_product_name?.toLowerCase().includes(searchLower) ||
+      payment.reference_number?.toLowerCase().includes(searchLower) ||
+      payment.payment_method?.toLowerCase().includes(searchLower)
     )
   })
 
@@ -226,30 +240,56 @@ export default function Payments() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Payments</h1>
             <p className="text-gray-600 dark:text-gray-400">Track and record loan payments</p>
           </div>
-          <div className="flex gap-3">
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="px-4 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+          {canRecordPayments && (
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
             >
-              {monthOptions.map((month) => (
-                <option key={month.value} value={month.value}>
-                  {month.label}
-                </option>
-              ))}
-            </select>
+              <Plus size={20} />
+              Record Payment
+            </button>
+          )}
+        </div>
 
-            {canRecordPayments && (
+        {/* Search and Filter Bar */}
+        <div className="flex gap-4 flex-wrap">
+          <div className="flex-1 min-w-[300px] relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search by customer, product, reference, or method..."
+              value={paymentSearchQuery}
+              onChange={(e) => setPaymentSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-10 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            />
+            {paymentSearchQuery && (
               <button
-                onClick={() => setShowModal(true)}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                onClick={() => setPaymentSearchQuery('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                <Plus size={20} />
-                Record Payment
+                <X size={18} />
               </button>
             )}
           </div>
+
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="px-4 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+          >
+            {monthOptions.map((month) => (
+              <option key={month.value} value={month.value}>
+                {month.label}
+              </option>
+            ))}
+          </select>
         </div>
+
+        {paymentSearchQuery && (
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Found {filteredPayments.length} {filteredPayments.length === 1 ? 'payment' : 'payments'}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 p-6 rounded-lg shadow">
@@ -303,14 +343,14 @@ export default function Payments() {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {payments.length === 0 ? (
+              {filteredPayments.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                    No payments recorded yet
+                    {paymentSearchQuery ? 'No payments found matching your search.' : 'No payments recorded yet'}
                   </td>
                 </tr>
               ) : (
-                payments.map((payment) => {
+                filteredPayments.map((payment) => {
                   const MethodIcon = getMethodIcon(payment.payment_method)
                   return (
                     <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
@@ -389,7 +429,6 @@ export default function Payments() {
                   Select Loan *
                 </label>
                 
-                {/* Search Input */}
                 <div className="relative mb-2">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                   <input
@@ -401,7 +440,6 @@ export default function Payments() {
                   />
                 </div>
 
-                {/* Loan Dropdown */}
                 <select
                   value={formData.loan_application_id}
                   onChange={handleLoanSelect}
@@ -536,7 +574,7 @@ export default function Payments() {
         </div>
       )}
 
-      {/* View, Edit, Delete Modals - Keep existing code */}
+      {/* Keep all existing modals (View, Edit, Delete) exactly as before */}
       {viewModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg">
@@ -562,7 +600,7 @@ export default function Payments() {
                   <p className="font-semibold dark:text-white">{viewModal.customer_name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Payment Method</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Method</p>
                   <p className="font-semibold dark:text-white capitalize">{viewModal.payment_method?.replace('_', ' ')}</p>
                 </div>
                 <div className="col-span-2">
@@ -672,7 +710,6 @@ export default function Payments() {
             <h3 className="text-lg font-semibold mb-4 dark:text-white">Delete Payment</h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               Delete payment of <strong className="dark:text-white">{formatCurrency(deleteModal.amount)}</strong>?
-              This cannot be undone.
             </p>
             <div className="flex gap-3">
               <button
