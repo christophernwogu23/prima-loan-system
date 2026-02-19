@@ -136,7 +136,7 @@ async def create_application(
 async def get_applications(
     month: Optional[str] = Query(None, regex="^\\d{4}-\\d{2}$"),
     officer_id: Optional[int] = Query(None, description="Filter by loan officer"),
-    search: Optional[str] = Query(None, description="Search by customer name or app number"),  # NEW
+    search: Optional[str] = Query(None, description="Search by customer name or app number"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
