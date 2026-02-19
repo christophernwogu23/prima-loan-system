@@ -118,6 +118,7 @@ export default function Layout({ children }) {
   manager: [
     { path: '/dashboard', label: 'Dashboard', icon: CreditCard },
     { path: '/users', label: 'Users', icon: Users },
+    { path: '/accounts', label: 'Accounts', icon: Wallet },
     { path: '/review-applications', label: 'All Applications', icon: ClipboardList },
     { path: '/settings', label: 'Settings', icon: Settings },
     { path: '/reports', label: 'Analytics', icon: BarChart3 },
@@ -130,6 +131,7 @@ export default function Layout({ children }) {
   ceo: [
     { path: '/dashboard', label: 'Dashboard', icon: CreditCard },
     { path: '/users', label: 'Users', icon: Users },
+    { path: '/accounts', label: 'Accounts', icon: Wallet },
     { path: '/review-applications', label: 'All Applications', icon: ClipboardList },
     { path: '/settings', label: 'Settings', icon: Settings },
     { path: '/reports', label: 'Analytics', icon: BarChart3 },
@@ -142,6 +144,7 @@ export default function Layout({ children }) {
   admin: [
     { path: '/dashboard', label: 'Dashboard', icon: CreditCard },
     { path: '/users', label: 'Users', icon: Users },
+    { path: '/accounts', label: 'Accounts', icon: Wallet },
     { path: '/review-applications', label: 'All Applications', icon: ClipboardList },
     { path: '/settings', label: 'Settings', icon: Settings },
     { path: '/reports', label: 'Analytics', icon: BarChart3 },

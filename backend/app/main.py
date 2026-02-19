@@ -98,6 +98,15 @@ app.include_router(notifications_router, prefix="/api/v1")
 from app.api.v1.reports import router as reports_router
 app.include_router(reports_router, prefix="/api/v1")
 
+from app.api.v1.accounts import router as accounts_router
+app.include_router(accounts_router, prefix="/api/v1")
+
+from app.api.v1.transit_account import router as transit_router
+app.include_router(transit_router, prefix="/api/v1")
+
+from app.api.v1.suspense_account import router as suspense_router
+app.include_router(suspense_router, prefix="/api/v1")
+
 @app.get("/health")
 async def health():
     return {

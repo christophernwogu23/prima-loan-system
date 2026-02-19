@@ -20,6 +20,12 @@ import Defaults from './pages/Defaults'
 import LoanOfficers from './pages/LoanOfficers'
 import CustomerAssignment from './pages/CustomerAssignment'
 import Savings from './pages/Savings'
+import Accounts from './pages/Accounts'
+import TransitAccount from './pages/accounts/TransitAccount'
+import SuspenseAccount from './pages/accounts/SuspenseAccount'
+import LoansAccount from './pages/accounts/LoansAccount'
+import SavingsAccount from './pages/accounts/SavingsAccount'
+
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuthStore()
@@ -50,7 +56,13 @@ export default function App() {
           <Route path="/loan-officers" element={<ProtectedRoute><LoanOfficers /></ProtectedRoute>} />
           <Route path="/customer-assignment" element={<ProtectedRoute><CustomerAssignment /></ProtectedRoute>} />
           <Route path="/savings" element={<ProtectedRoute><Savings /></ProtectedRoute>} />
-          
+          <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
+          <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
+          <Route path="/accounts/transit" element={<ProtectedRoute><TransitAccount /></ProtectedRoute>} />
+          <Route path="/accounts/suspense" element={<ProtectedRoute><SuspenseAccount /></ProtectedRoute>} />
+          <Route path="/accounts/loans" element={<ProtectedRoute><LoansAccount /></ProtectedRoute>} />
+          <Route path="/accounts/savings" element={<ProtectedRoute><SavingsAccount /></ProtectedRoute>} />
+                    
         </Routes>
         <Toaster position="top-right" />
       </BrowserRouter>
