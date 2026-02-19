@@ -23,9 +23,9 @@ class ApplicationResponse(BaseModel):
     id: int
     application_number: str
     customer_id: int
-    customer_name: Optional[str] = None  # NEW
+    customer_name: Optional[str] = None
     loan_product_id: int
-    product_name: Optional[str] = None  # NEW
+    product_name: Optional[str] = None
     requested_amount: float
     approved_amount: Optional[float] = None
     tenure_months: int
@@ -41,7 +41,7 @@ class ApplicationResponse(BaseModel):
         from_attributes = True
 
 class ReviewRequest(BaseModel):
-    action: str  # "approve" or "reject"
+    action: str
     comments: Optional[str] = None
 
 def generate_application_number():
@@ -53,9 +53,8 @@ async def create_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Determine the customer
+    """Create a new loan application"""
     if app_data.customer_id:
-        # Officer applying on behalf of customer
         if current_user.role not in ["loan_officer", "manager", "admin"]:
             raise HTTPException(status_code=403, detail="Only staff can apply on behalf of customers")
         
@@ -63,7 +62,6 @@ async def create_application(
         if not customer or customer.role != "customer":
             raise HTTPException(status_code=404, detail="Customer not found")
         
-        # Loan officers can only apply for their assigned customers
         if current_user.role == "loan_officer":
             if customer.assigned_officer_id != current_user.id:
                 raise HTTPException(status_code=403, detail="Customer not assigned to you")
@@ -71,26 +69,21 @@ async def create_application(
         customer_id = app_data.customer_id
         assigned_officer_id = current_user.id if current_user.role == "loan_officer" else customer.assigned_officer_id
     else:
-        # Customer applying for themselves
         if current_user.role != "customer":
             raise HTTPException(status_code=400, detail="Please specify customer_id")
         customer_id = current_user.id
         assigned_officer_id = current_user.assigned_officer_id
     
-    # Check if product exists
     product = db.query(LoanProduct).filter(LoanProduct.id == app_data.loan_product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Loan product not found")
     
-    # Validate amount
     if app_data.requested_amount < product.min_amount or app_data.requested_amount > product.max_amount:
         raise HTTPException(status_code=400, detail=f"Amount must be between {product.min_amount} and {product.max_amount}")
     
-    # Validate tenure
     if app_data.tenure_months < product.min_tenure_months or app_data.tenure_months > product.max_tenure_months:
         raise HTTPException(status_code=400, detail=f"Tenure must be between {product.min_tenure_months} and {product.max_tenure_months} months")
     
-    # Create application
     application = LoanApplication(
         application_number=generate_application_number(),
         customer_id=customer_id,
@@ -107,12 +100,10 @@ async def create_application(
     db.commit()
     db.refresh(application)
     
-    # Get customer and product names for response
     customer = db.query(User).filter(User.id == customer_id).first()
     customer_name = f"{customer.first_name} {customer.last_name}" if customer else None
     product_name = product.name if product else None
     
-    # Return with names
     return ApplicationResponse(
         id=application.id,
         application_number=application.application_number,
@@ -135,14 +126,13 @@ async def create_application(
 @router.get("/")
 async def get_applications(
     month: Optional[str] = Query(None, regex="^\\d{4}-\\d{2}$"),
-    officer_id: Optional[int] = Query(None, description="Filter by loan officer"),
-    search: Optional[str] = Query(None, description="Search by customer name or app number"),
+    officer_id: Optional[int] = Query(None),
+    search: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get loan applications with role-based filtering and customer names"""
+    """Get all applications with customer and product names"""
     
-    # Use JOIN to get customer and product names
     query = db.query(
         LoanApplication,
         User.first_name,
@@ -154,7 +144,6 @@ async def get_applications(
         LoanProduct, LoanApplication.loan_product_id == LoanProduct.id
     )
     
-    # Role-based filtering
     if current_user.role == "customer":
         query = query.filter(LoanApplication.customer_id == current_user.id)
     elif current_user.role == "loan_officer":
@@ -163,7 +152,6 @@ async def get_applications(
         if officer_id:
             query = query.filter(LoanApplication.assigned_officer_id == officer_id)
     
-    # Search filtering
     if search:
         search_term = f"%{search}%"
         query = query.filter(
@@ -172,7 +160,6 @@ async def get_applications(
             (LoanApplication.application_number.ilike(search_term))
         )
     
-    # Month filtering
     if month:
         year, month_num = map(int, month.split("-"))
         start_date = datetime(year, month_num, 1)
@@ -188,10 +175,9 @@ async def get_applications(
     
     results = query.order_by(LoanApplication.created_at.desc()).all()
     
-    # Build response with customer names
     applications = []
     for app, first_name, last_name, product_name in results:
-        app_dict = {
+        applications.append({
             "id": app.id,
             "application_number": app.application_number,
             "customer_id": app.customer_id,
@@ -208,31 +194,27 @@ async def get_applications(
             "manager_comments": app.manager_comments,
             "ceo_comments": app.ceo_comments,
             "created_at": app.created_at
-        }
-        applications.append(app_dict)
+        })
     
     return applications
 
-# Keep all your other endpoints the same (get_application, get_user_applications, review, update, delete)
-@router.get("/{app_id}")
+@router.get("/{app_id}", response_model=ApplicationResponse)
 async def get_application(
     app_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get a single application by ID"""
+    """Get a single application"""
     application = db.query(LoanApplication).filter(LoanApplication.id == app_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
     
-    # Check permissions
     if current_user.role == "customer" and application.customer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     if current_user.role == "loan_officer" and application.assigned_officer_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied - application not assigned to you")
+        raise HTTPException(status_code=403, detail="Access denied")
     
-    # Get customer and product info
     customer = db.query(User).filter(User.id == application.customer_id).first()
     product = db.query(LoanProduct).filter(LoanProduct.id == application.loan_product_id).first()
     
@@ -261,14 +243,14 @@ async def get_user_applications(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all applications for a specific user"""
+    """Get applications for a user"""
     if current_user.role == "customer" and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     if current_user.role == "loan_officer":
         customer = db.query(User).filter(User.id == user_id).first()
         if not customer or customer.assigned_officer_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Access denied - customer not assigned to you")
+            raise HTTPException(status_code=403, detail="Access denied")
     
     applications = db.query(LoanApplication).filter(
         LoanApplication.customer_id == user_id
@@ -283,13 +265,13 @@ async def review_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Review an application"""
+    """Review application"""
     application = db.query(LoanApplication).filter(LoanApplication.id == app_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
     
     if current_user.role == "loan_officer" and application.assigned_officer_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied - application not assigned to you")
+        raise HTTPException(status_code=403, detail="Access denied")
     
     current_status = application.status
     action = review.action.lower()
@@ -342,7 +324,6 @@ async def review_application(
     
     elif role == "admin":
         raise HTTPException(status_code=403, detail="Admin observes but does not participate in approvals")
-    
     else:
         raise HTTPException(status_code=403, detail="Access denied")
     
@@ -361,9 +342,9 @@ async def update_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Update an application"""
+    """Update application"""
     if current_user.role not in ["admin", "ceo"]:
-        raise HTTPException(status_code=403, detail="Only admin and CEO can edit applications")
+        raise HTTPException(status_code=403, detail="Only admin and CEO can edit")
     
     application = db.query(LoanApplication).filter(LoanApplication.id == application_id).first()
     if not application:
@@ -383,9 +364,9 @@ async def delete_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Delete an application"""
+    """Delete application"""
     if current_user.role not in ["admin", "ceo"]:
-        raise HTTPException(status_code=403, detail="Only admin and CEO can delete applications")
+        raise HTTPException(status_code=403, detail="Only admin and CEO can delete")
     
     application = db.query(LoanApplication).filter(LoanApplication.id == application_id).first()
     if not application:
@@ -395,7 +376,7 @@ async def delete_application(
     if payments > 0:
         raise HTTPException(
             status_code=400, 
-            detail=f"Cannot delete application with {payments} payment(s). Please delete payments first."
+            detail=f"Cannot delete application with {payments} payment(s)."
         )
     
     db.delete(application)
