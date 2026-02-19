@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
 import { getPayments, createPayment, updatePayment, deletePayment, getDisbursedLoans, getPaymentSummary } from '../api/payments'
-import { DollarSign, Plus, X, CreditCard, Building, Banknote, Smartphone, Wallet, Eye, Edit2, Trash2 } from 'lucide-react'
+import { DollarSign, Plus, X, CreditCard, Building, Banknote, Smartphone, Wallet, Eye, Edit2, Trash2, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
 
@@ -10,10 +10,11 @@ const PAYMENT_METHODS = [
   { value: 'bank_transfer', label: 'Bank Transfer', icon: Building },
   { value: 'cheque', label: 'Cheque', icon: CreditCard },
   { value: 'mobile_money', label: 'Mobile Money', icon: Smartphone },
-  { value: 'savings_account', label: 'Savings Account', icon: Wallet } 
+  { value: 'savings_account', label: 'Savings Account', icon: Wallet }
 ]
 
 export default function Payments() {
+  const { user } = useAuthStore()
   const [payments, setPayments] = useState([])
   const [disbursedLoans, setDisbursedLoans] = useState([])
   const [loading, setLoading] = useState(true)
@@ -24,8 +25,10 @@ export default function Payments() {
   const [selectedMonth, setSelectedMonth] = useState('')
   const [selectedLoan, setSelectedLoan] = useState(null)
   const [loanSummary, setLoanSummary] = useState(null)
+  const [loanSearchQuery, setLoanSearchQuery] = useState('')
   const [updating, setUpdating] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  
   const [formData, setFormData] = useState({
     loan_application_id: '',
     amount: '',
@@ -34,12 +37,10 @@ export default function Payments() {
     notes: ''
   })
 
-  const { user } = useAuthStore()
-  const canRecordPayments = ['admin', 'manager', 'loan_officer'].includes(user.role)
-  const canModify = ['admin', 'ceo'].includes(user.role)
-  const canViewLoans = ['admin', 'manager', 'loan_officer', 'ceo'].includes(user.role)
+  const canRecordPayments = ['admin', 'manager', 'loan_officer'].includes(user?.role)
+  const canModify = ['admin', 'ceo'].includes(user?.role)
+  const canViewLoans = ['admin', 'manager', 'loan_officer', 'ceo'].includes(user?.role)
 
-  // Generate month options
   const generateMonthOptions = () => {
     const months = [{ value: '', label: 'All Time' }]
     const now = new Date()
@@ -119,6 +120,7 @@ export default function Payments() {
       })
       setSelectedLoan(null)
       setLoanSummary(null)
+      setLoanSearchQuery('')
       loadData()
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to record payment')
@@ -147,12 +149,11 @@ export default function Payments() {
         reference_number: editModal.reference_number,
         notes: editModal.notes
       })
-      toast.success('Payment updated successfully!')
+      toast.success('Payment updated!')
       setEditModal(null)
       loadData()
     } catch (error) {
-      console.error('Failed to update payment:', error)
-      toast.error(error.response?.data?.detail || 'Failed to update payment')
+      toast.error(error.response?.data?.detail || 'Failed to update')
     } finally {
       setUpdating(false)
     }
@@ -164,12 +165,11 @@ export default function Payments() {
     setDeleting(true)
     try {
       await deletePayment(deleteModal.id)
-      toast.success('Payment deleted successfully!')
+      toast.success('Payment deleted!')
       setDeleteModal(null)
       loadData()
     } catch (error) {
-      console.error('Failed to delete payment:', error)
-      toast.error(error.response?.data?.detail || 'Failed to delete payment')
+      toast.error(error.response?.data?.detail || 'Failed to delete')
     } finally {
       setDeleting(false)
     }
@@ -198,6 +198,16 @@ export default function Payments() {
     return methodObj ? methodObj.icon : DollarSign
   }
 
+  const filteredLoans = disbursedLoans.filter(loan => {
+    if (!loanSearchQuery) return true
+    const searchLower = loanSearchQuery.toLowerCase()
+    return (
+      loan.customer_name.toLowerCase().includes(searchLower) ||
+      loan.product_name.toLowerCase().includes(searchLower) ||
+      loan.id.toString().includes(searchLower)
+    )
+  })
+
   if (loading) {
     return (
       <Layout>
@@ -211,18 +221,16 @@ export default function Payments() {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Payments</h1>
             <p className="text-gray-600 dark:text-gray-400">Track and record loan payments</p>
           </div>
           <div className="flex gap-3">
-            {/* Month Filter */}
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 font-medium text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
             >
               {monthOptions.map((month) => (
                 <option key={month.value} value={month.value}>
@@ -234,16 +242,15 @@ export default function Payments() {
             {canRecordPayments && (
               <button
                 onClick={() => setShowModal(true)}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
               >
-                <Plus className="w-4 h-4" />
+                <Plus size={20} />
                 Record Payment
               </button>
             )}
           </div>
         </div>
 
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 p-6 rounded-lg shadow">
             <div className="flex items-center gap-3">
@@ -282,7 +289,6 @@ export default function Payments() {
           </div>
         </div>
 
-        {/* Payments Table */}
         <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
@@ -307,39 +313,32 @@ export default function Payments() {
                 payments.map((payment) => {
                   const MethodIcon = getMethodIcon(payment.payment_method)
                   return (
-                    <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {formatDate(payment.payment_date)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {payment.customer_name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                    <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 text-sm dark:text-white">{formatDate(payment.payment_date)}</td>
+                      <td className="px-6 py-4 text-sm dark:text-white">{payment.customer_name}</td>
+                      <td className="px-6 py-4 text-sm dark:text-gray-300">
                         {payment.loan_product_name}
-                        <span className="text-gray-400 dark:text-gray-500 ml-1">
-                          ({formatCurrency(payment.loan_amount)})
-                        </span>
+                        <span className="text-gray-400 ml-1">({formatCurrency(payment.loan_amount)})</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <MethodIcon className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-600 dark:text-gray-300 capitalize">
+                          <span className="text-sm dark:text-gray-300 capitalize">
                             {payment.payment_method?.replace('_', ' ')}
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                         {payment.reference_number || '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600 dark:text-green-400 text-right">
+                      <td className="px-6 py-4 text-sm font-medium text-green-600 dark:text-green-400 text-right">
                         {formatCurrency(payment.amount)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
                           <button
                             onClick={() => setViewModal(payment)}
-                            className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-                            title="View details"
+                            className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
                           >
                             <Eye size={18} />
                           </button>
@@ -347,15 +346,13 @@ export default function Payments() {
                             <>
                               <button
                                 onClick={() => handleEdit(payment)}
-                                className="p-1 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors"
-                                title="Edit"
+                                className="p-1 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded"
                               >
                                 <Edit2 size={18} />
                               </button>
                               <button
                                 onClick={() => setDeleteModal(payment)}
-                                className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                                title="Delete"
+                                className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
                               >
                                 <Trash2 size={18} />
                               </button>
@@ -374,15 +371,15 @@ export default function Payments() {
 
       {/* Record Payment Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold dark:text-white">Record Payment</h2>
-              <button 
-                onClick={() => setShowModal(false)} 
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              >
-                <X className="w-5 h-5" />
+              <button onClick={() => {
+                setShowModal(false)
+                setLoanSearchQuery('')
+              }} className="text-gray-500 hover:text-gray-700">
+                <X size={20} />
               </button>
             </div>
 
@@ -391,19 +388,37 @@ export default function Payments() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Select Loan *
                 </label>
+                
+                {/* Search Input */}
+                <div className="relative mb-2">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search customer, loan ID, or product..."
+                    value={loanSearchQuery}
+                    onChange={(e) => setLoanSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+
+                {/* Loan Dropdown */}
                 <select
                   value={formData.loan_application_id}
                   onChange={handleLoanSelect}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white"
+                  size="5"
                   required
                 >
                   <option value="">Choose a loan...</option>
-                  {disbursedLoans.map((loan) => (
+                  {filteredLoans.map((loan) => (
                     <option key={loan.id} value={loan.id}>
                       {loan.customer_name} - {loan.product_name} ({formatCurrency(loan.amount)})
                     </option>
                   ))}
                 </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Showing {filteredLoans.length} of {disbursedLoans.length} loans
+                </p>
               </div>
 
               {loanSummary && (
@@ -423,23 +438,24 @@ export default function Payments() {
                 </div>
               )}
 
+              {selectedLoan && formData.payment_method === 'savings_account' && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded-lg text-sm">
+                  <p className="text-yellow-800 dark:text-yellow-300">
+                    <strong>Note:</strong> Payment will be deducted from customer's savings account.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {selectedLoan && formData.payment_method === 'savings_account' && (
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded-lg text-sm">
-                      <p className="text-yellow-800 dark:text-yellow-300">
-                        <strong>Note:</strong> Payment will be deducted from customer's savings account.
-                      </p>
-                    </div>
-                  )}
-                  Amount *
+                  Amount (₦) *
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white"
                   placeholder="0.00"
                   required
                 />
@@ -457,10 +473,10 @@ export default function Payments() {
                         key={method.value}
                         type="button"
                         onClick={() => setFormData({ ...formData, payment_method: method.value })}
-                        className={`flex items-center gap-2 p-3 border rounded-lg transition-colors ${
+                        className={`flex items-center gap-2 p-3 border rounded-lg ${
                           formData.payment_method === method.value
                             ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                            : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 dark:text-gray-300'
+                            : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:text-gray-300'
                         }`}
                       >
                         <Icon className="w-4 h-4" />
@@ -479,7 +495,7 @@ export default function Payments() {
                   type="text"
                   value={formData.reference_number}
                   onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white"
                   placeholder="Transaction ID, cheque number, etc."
                 />
               </div>
@@ -491,7 +507,7 @@ export default function Payments() {
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white"
                   rows="2"
                   placeholder="Optional notes..."
                 />
@@ -500,14 +516,17 @@ export default function Payments() {
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white transition-colors"
+                  onClick={() => {
+                    setShowModal(false)
+                    setLoanSearchQuery('')
+                  }}
+                  className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
                   Record Payment
                 </button>
@@ -517,17 +536,14 @@ export default function Payments() {
         </div>
       )}
 
-      {/* View Modal */}
+      {/* View, Edit, Delete Modals - Keep existing code */}
       {viewModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg">
             <div className="border-b dark:border-gray-700 px-6 py-4 flex justify-between items-center">
               <h3 className="text-lg font-semibold dark:text-white">Payment Details</h3>
-              <button 
-                onClick={() => setViewModal(null)} 
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              >
-                <X className="w-5 h-5" />
+              <button onClick={() => setViewModal(null)} className="text-gray-500 hover:text-gray-700">
+                <X size={20} />
               </button>
             </div>
 
@@ -555,7 +571,7 @@ export default function Payments() {
                 </div>
                 {viewModal.reference_number && (
                   <div className="col-span-2">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Reference Number</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Reference</p>
                     <p className="font-semibold dark:text-white">{viewModal.reference_number}</p>
                   </div>
                 )}
@@ -571,73 +587,59 @@ export default function Payments() {
         </div>
       )}
 
-      {/* Edit Modal */}
       {editModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-lg">
             <div className="border-b dark:border-gray-700 px-6 py-4 flex justify-between items-center">
               <h3 className="text-lg font-semibold dark:text-white">Edit Payment</h3>
-              <button 
-                onClick={() => setEditModal(null)} 
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              >
-                <X className="w-5 h-5" />
+              <button onClick={() => setEditModal(null)} className="text-gray-500 hover:text-gray-700">
+                <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleUpdate} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Amount (₦)
-                </label>
+                <label className="block text-sm font-medium dark:text-gray-300 mb-1">Amount (₦)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={editModal.amount}
                   onChange={(e) => setEditModal({...editModal, amount: e.target.value})}
-                  className="w-full border dark:border-gray-600 border-gray-300 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Payment Method
-                </label>
+                <label className="block text-sm font-medium dark:text-gray-300 mb-1">Method</label>
                 <select
                   value={editModal.payment_method}
                   onChange={(e) => setEditModal({...editModal, payment_method: e.target.value})}
-                  className="w-full border dark:border-gray-600 border-gray-300 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white"
                   required
                 >
                   {PAYMENT_METHODS.map((method) => (
-                    <option key={method.value} value={method.value}>
-                      {method.label}
-                    </option>
+                    <option key={method.value} value={method.value}>{method.label}</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Reference Number
-                </label>
+                <label className="block text-sm font-medium dark:text-gray-300 mb-1">Reference</label>
                 <input
                   type="text"
                   value={editModal.reference_number}
                   onChange={(e) => setEditModal({...editModal, reference_number: e.target.value})}
-                  className="w-full border dark:border-gray-600 border-gray-300 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Notes
-                </label>
+                <label className="block text-sm font-medium dark:text-gray-300 mb-1">Notes</label>
                 <textarea
                   value={editModal.notes}
                   onChange={(e) => setEditModal({...editModal, notes: e.target.value})}
-                  className="w-full border dark:border-gray-600 border-gray-300 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white"
                   rows="3"
                 />
               </div>
@@ -646,7 +648,7 @@ export default function Payments() {
                 <button
                   type="button"
                   onClick={() => setEditModal(null)}
-                  className="flex-1 px-4 py-2 border dark:border-gray-600 border-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white transition-colors"
+                  className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white"
                   disabled={updating}
                 >
                   Cancel
@@ -654,7 +656,7 @@ export default function Payments() {
                 <button
                   type="submit"
                   disabled={updating}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
                   {updating ? 'Updating...' : 'Update'}
                 </button>
@@ -664,19 +666,18 @@ export default function Payments() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {deleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-4 dark:text-white">Delete Payment</h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Are you sure you want to delete this payment of <strong className="dark:text-white">{formatCurrency(deleteModal.amount)}</strong>?
-              This action cannot be undone.
+              Delete payment of <strong className="dark:text-white">{formatCurrency(deleteModal.amount)}</strong>?
+              This cannot be undone.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteModal(null)}
-                className="flex-1 px-4 py-2 border dark:border-gray-600 border-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white transition-colors"
+                className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white"
                 disabled={deleting}
               >
                 Cancel
@@ -684,7 +685,7 @@ export default function Payments() {
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 {deleting ? 'Deleting...' : 'Delete'}
               </button>
