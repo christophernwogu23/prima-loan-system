@@ -1,9 +1,10 @@
 import client from './client'
 
-export const getApplications = async (month = null, officerId = null) => {
+export const getApplications = async (month = null, officerId = null, search = null) => {
   const params = []
   if (month) params.push(`month=${month}`)
   if (officerId) params.push(`officer_id=${officerId}`)
+  if (search) params.push(`search=${encodeURIComponent(search)}`)
   
   let url = '/applications/'
   if (params.length > 0) {
