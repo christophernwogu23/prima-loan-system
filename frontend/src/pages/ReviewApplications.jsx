@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import api from '../api/api'
+import client from '../api/client'
 import Layout from '../components/Layout'
 import { useAuthStore } from '../store/authStore'
 import { getApplications, deleteApplication, updateApplication, reviewApplication } from '../api/applications'
@@ -69,7 +69,7 @@ export default function ReviewApplications() {
         url += `?${params.join('&')}`
       }
       
-      const { data } = await api.get(url)
+      const { data } = await client.get(url)
       setApplications(data)
     } catch (error) {
       console.error('Failed to load applications:', error)
