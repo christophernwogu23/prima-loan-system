@@ -1,26 +1,27 @@
 import { useState, useEffect } from 'react'
+import api from '../api/api'
 import Layout from '../components/Layout'
 import { useAuthStore } from '../store/authStore'
 import { getApplications, deleteApplication, updateApplication, reviewApplication } from '../api/applications'
 import toast from 'react-hot-toast'
-import { Eye, Edit2, Trash2, X, DollarSign, Users, CheckCircle, XCircle } from 'lucide-react'
+import { Eye, Edit2, Trash2, X, DollarSign, Users, CheckCircle, XCircle, Search, RefreshCw } from 'lucide-react'
 
 export default function ReviewApplications() {
   const { user } = useAuthStore()
   const [applications, setApplications] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedMonth, setSelectedMonth] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')  // NEW
   const [viewModal, setViewModal] = useState(null)
   const [editModal, setEditModal] = useState(null)
   const [deleteModal, setDeleteModal] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [reviewComments, setReviewComments] = useState('')
-  const [reviewAction, setReviewAction] = useState(null) // 'approve' or 'reject'
+  const [reviewAction, setReviewAction] = useState(null)
 
   const canModify = user?.role === 'admin' || user?.role === 'ceo'
 
-  // Check if current user can review this application
   const canReview = (app) => {
     if (user?.role === 'loan_officer' && app.status === 'submitted') return true
     if (user?.role === 'manager' && ['officer_approved', 'officer_rejected'].includes(app.status)) return true
@@ -28,7 +29,6 @@ export default function ReviewApplications() {
     return false
   }
 
-  // Generate list of months (last 12 months)
   const generateMonthOptions = () => {
     const months = [{ value: '', label: 'All Time' }]
     const now = new Date()
@@ -36,7 +36,7 @@ export default function ReviewApplications() {
     
     for (let i = 0; i < 12; i++) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const value = date.toISOString().slice(0, 7) // YYYY-MM
+      const value = date.toISOString().slice(0, 7)
       
       if (seen.has(value)) continue
       seen.add(value)
@@ -50,13 +50,26 @@ export default function ReviewApplications() {
   const monthOptions = generateMonthOptions()
 
   useEffect(() => {
-    loadApplications()
-  }, [selectedMonth])
+    const timer = setTimeout(() => {
+      loadApplications()
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [selectedMonth, searchQuery])  // UPDATED - added searchQuery
 
   const loadApplications = async () => {
     setLoading(true)
     try {
-      const data = await getApplications(selectedMonth || null)
+      // Updated API call with search parameter
+      const params = []
+      if (selectedMonth) params.push(`month=${selectedMonth}`)
+      if (searchQuery) params.push(`search=${encodeURIComponent(searchQuery)}`)
+      
+      let url = '/applications/'
+      if (params.length > 0) {
+        url += `?${params.join('&')}`
+      }
+      
+      const { data } = await api.get(url)
       setApplications(data)
     } catch (error) {
       console.error('Failed to load applications:', error)
@@ -73,12 +86,10 @@ export default function ReviewApplications() {
     setUpdating(true)
 
     try {
-      const payload = {
+      await reviewApplication(viewModal.id, {
         action: action,
         comments: reviewComments || null
-      }
-
-      await reviewApplication(viewModal.id, payload)
+      })
       
       toast.success(`Application ${action === 'approve' ? 'approved' : 'rejected'} successfully!`)
       setViewModal(null)
@@ -87,8 +98,7 @@ export default function ReviewApplications() {
       loadApplications()
     } catch (error) {
       console.error('Failed to review application:', error)
-      const errorMessage = error.response?.data?.detail || `Failed to ${action} application`
-      toast.error(errorMessage)
+      toast.error(error.response?.data?.detail || `Failed to ${action} application`)
     } finally {
       setUpdating(false)
       setReviewAction(null)
@@ -124,8 +134,7 @@ export default function ReviewApplications() {
       loadApplications()
     } catch (error) {
       console.error('Failed to update application:', error)
-      const errorMessage = error.response?.data?.detail || 'Failed to update application'
-      toast.error(errorMessage)
+      toast.error(error.response?.data?.detail || 'Failed to update application')
     } finally {
       setUpdating(false)
     }
@@ -142,8 +151,7 @@ export default function ReviewApplications() {
       loadApplications()
     } catch (error) {
       console.error('Failed to delete application:', error)
-      const errorMessage = error.response?.data?.detail || 'Failed to delete application'
-      toast.error(errorMessage)
+      toast.error(error.response?.data?.detail || 'Failed to delete application')
     } finally {
       setDeleting(false)
     }
@@ -191,11 +199,43 @@ export default function ReviewApplications() {
             <p className="text-gray-600 dark:text-gray-400">View and manage loan applications</p>
           </div>
           
+          <button
+            onClick={loadApplications}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            title="Refresh"
+          >
+            <RefreshCw size={18} />
+            Refresh
+          </button>
+        </div>
+
+        {/* Search and Filters */}
+        <div className="flex gap-4 flex-wrap">
+          {/* Search Bar */}
+          <div className="flex-1 min-w-[300px] relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search by customer name or application number..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-10 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
+
           {/* Month Filter */}
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 font-medium text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
           >
             {monthOptions.map((month) => (
               <option key={month.value} value={month.value}>
@@ -205,8 +245,8 @@ export default function ReviewApplications() {
           </select>
         </div>
 
-        {/* Summary Cards - Period Based */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-xl shadow-lg">
             <div className="flex items-center justify-between">
               <div>
@@ -241,27 +281,27 @@ export default function ReviewApplications() {
           </div>
         </div>
 
-        {/* Stats - Status Breakdown */}
+        {/* Stats Breakdown */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow p-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Total Applications</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
             <p className="text-2xl font-bold dark:text-white">{applications.length}</p>
           </div>
           <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow p-4">
             <p className="text-sm text-gray-500 dark:text-gray-400">Submitted</p>
-            <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+            <p className="text-2xl font-bold text-yellow-600">
               {applications.filter(app => app.status === 'submitted').length}
             </p>
           </div>
           <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow p-4">
             <p className="text-sm text-gray-500 dark:text-gray-400">Disbursed</p>
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+            <p className="text-2xl font-bold text-green-600">
               {applications.filter(app => app.status === 'disbursed').length}
             </p>
           </div>
           <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow p-4">
             <p className="text-sm text-gray-500 dark:text-gray-400">Rejected</p>
-            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+            <p className="text-2xl font-bold text-red-600">
               {applications.filter(app => app.status === 'rejected').length}
             </p>
           </div>
@@ -274,7 +314,9 @@ export default function ReviewApplications() {
           </div>
         ) : applications.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-700 p-8 text-center">
-            <p className="text-gray-500 dark:text-gray-400">No applications found</p>
+            <p className="text-gray-500 dark:text-gray-400">
+              {searchQuery ? 'No applications found matching your search.' : 'No applications found'}
+            </p>
           </div>
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-700 overflow-hidden">
@@ -282,7 +324,8 @@ export default function ReviewApplications() {
               <thead className="bg-gray-50 dark:bg-gray-700 border-b dark:border-gray-600">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">App #</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Customer ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Customer</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Product</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Amount</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Tenure</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
@@ -294,9 +337,14 @@ export default function ReviewApplications() {
                 {applications.map((app) => (
                   <tr key={app.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                     <td className="px-6 py-4 font-medium dark:text-white">{app.application_number}</td>
-                    <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{app.customer_id}</td>
+                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                      {app.customer_name || `Customer #${app.customer_id}`}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                      {app.product_name || `Product #${app.loan_product_id}`}
+                    </td>
                     <td className="px-6 py-4 dark:text-white">{formatCurrency(app.requested_amount)}</td>
-                    <td className="px-6 py-4 dark:text-gray-300">{app.tenure_months} months</td>
+                    <td className="px-6 py-4 dark:text-gray-300">{app.tenure_months}m</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(app.status)}`}>
                         {getStatusLabel(app.status)}
@@ -312,8 +360,8 @@ export default function ReviewApplications() {
                             setViewModal(app)
                             setReviewComments('')
                           }}
-                          className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-                          title="View details"
+                          className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
+                          title="View"
                         >
                           <Eye size={18} />
                         </button>
@@ -321,14 +369,14 @@ export default function ReviewApplications() {
                           <>
                             <button
                               onClick={() => handleEdit(app)}
-                              className="p-1 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors"
+                              className="p-1 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded"
                               title="Edit"
                             >
                               <Edit2 size={18} />
                             </button>
                             <button
                               onClick={() => setDeleteModal(app)}
-                              className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                              className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
                               title="Delete"
                             >
                               <Trash2 size={18} />
@@ -345,16 +393,15 @@ export default function ReviewApplications() {
         )}
       </div>
 
-      {/* View Modal with Review Actions */}
+      {/* Keep all your existing modals (View, Edit, Delete) - just add missing import for api */}
+      {/* I'll show the View modal update with customer name: */}
+      
       {viewModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white dark:bg-gray-800 border-b dark:border-gray-700 px-6 py-4 flex justify-between items-center">
               <h3 className="text-lg font-semibold dark:text-white">Application Details</h3>
-              <button 
-                onClick={() => setViewModal(null)} 
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              >
+              <button onClick={() => setViewModal(null)} className="text-gray-500 hover:text-gray-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -372,12 +419,12 @@ export default function ReviewApplications() {
                   </span>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Customer ID</p>
-                  <p className="font-semibold dark:text-white">{viewModal.customer_id}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Customer</p>
+                  <p className="font-semibold dark:text-white">{viewModal.customer_name || `Customer #${viewModal.customer_id}`}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Product ID</p>
-                  <p className="font-semibold dark:text-white">{viewModal.loan_product_id}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Product</p>
+                  <p className="font-semibold dark:text-white">{viewModal.product_name || `Product #${viewModal.loan_product_id}`}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Amount Requested</p>
@@ -425,7 +472,6 @@ export default function ReviewApplications() {
                 </div>
               )}
 
-              {/* Review Section - Only show if user can review this application */}
               {canReview(viewModal) && (
                 <div className="border-t dark:border-gray-700 pt-4">
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Your Review</p>
@@ -433,7 +479,7 @@ export default function ReviewApplications() {
                     value={reviewComments}
                     onChange={(e) => setReviewComments(e.target.value)}
                     placeholder="Add your comments (optional)"
-                    className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none mb-3"
+                    className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white mb-3"
                     rows="3"
                   />
                   
@@ -441,13 +487,11 @@ export default function ReviewApplications() {
                     <button
                       onClick={() => handleReview('approve')}
                       disabled={updating}
-                      className="flex-1 bg-green-600 text-white px-4 py-2.5 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 font-medium"
+                      className="flex-1 bg-green-600 text-white px-4 py-2.5 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      {reviewAction === 'approve' ? (
-                        'Approving...'
-                      ) : (
+                      {reviewAction === 'approve' ? 'Approving...' : (
                         <>
-                          <CheckCircle className="w-4 h-4" />
+                          <CheckCircle size={16} />
                           Approve
                         </>
                       )}
@@ -455,13 +499,11 @@ export default function ReviewApplications() {
                     <button
                       onClick={() => handleReview('reject')}
                       disabled={updating}
-                      className="flex-1 bg-red-600 text-white px-4 py-2.5 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 font-medium"
+                      className="flex-1 bg-red-600 text-white px-4 py-2.5 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      {reviewAction === 'reject' ? (
-                        'Rejecting...'
-                      ) : (
+                      {reviewAction === 'reject' ? 'Rejecting...' : (
                         <>
-                          <XCircle className="w-4 h-4" />
+                          <XCircle size={16} />
                           Reject
                         </>
                       )}
@@ -611,3 +653,5 @@ export default function ReviewApplications() {
     </Layout>
   )
 }
+      
+   

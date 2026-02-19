@@ -5,3 +5,5 @@ from app.models.expense import Expense
 from app.models.savings import Savings
 from app.models.fixed_deposit import FixedDeposit
 from app.models.shareholder import Shareholder
+from app.models.transit_account import TransitDeposit
+from app.models.suspense_account import SuspensePayment
