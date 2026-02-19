@@ -109,6 +109,7 @@ export default function Layout({ children }) {
   loan_officer: [
     { path: '/dashboard', label: 'Dashboard', icon: CreditCard },
     { path: '/users', label: 'Users', icon: Users },
+    { path: '/accounts', label: 'Accounts', icon: Wallet },
     { path: '/review-applications', label: 'All Applications', icon: ClipboardList },
     { path: '/settings', label: 'Settings', icon: Settings },
     { path: '/reports', label: 'Analytics', icon: BarChart3 },
