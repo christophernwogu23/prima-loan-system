@@ -4,7 +4,8 @@ import Layout from '../../components/Layout'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
 import { ArrowLeft, Plus, X, Building, CheckCircle, Trash2 } from 'lucide-react'
-import api from '../../api/api'
+import api from '../../api/client'
+import client from '../../api/client'
 
 export default function TransitAccount() {
   const { user } = useAuthStore()
@@ -39,8 +40,8 @@ export default function TransitAccount() {
     setLoading(true)
     try {
       const [depositsRes, statsRes] = await Promise.all([
-        api.get(`/transit/?show_deposited=${showAll}`),
-        api.get('/transit/stats')
+        client.get(`/transit/?show_deposited=${showAll}`),
+        client.get('/transit/stats')
       ])
       setDeposits(depositsRes.data)
       setStats(statsRes.data)
@@ -55,7 +56,7 @@ export default function TransitAccount() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      await api.post('/transit/', {
+      await client.post('/transit/', {
         ...formData,
         amount: parseFloat(formData.amount)
       })
@@ -76,7 +77,7 @@ export default function TransitAccount() {
 
   const handleDepositToBank = async (depositId) => {
     try {
-      await api.post(`/transit/${depositId}/deposit-to-bank`, bankDepositData)
+      await client.post(`/transit/${depositId}/deposit-to-bank`, bankDepositData)
       toast.success('Deposited to bank successfully!')
       setShowDepositModal(null)
       setBankDepositData({ reference_number: '' })
@@ -89,7 +90,7 @@ export default function TransitAccount() {
   const handleDelete = async (depositId) => {
     if (!confirm('Delete this transit deposit?')) return
     try {
-      await api.delete(`/transit/${depositId}`)
+      await client.delete(`/transit/${depositId}`)
       toast.success('Deposit deleted')
       loadData()
     } catch (error) {

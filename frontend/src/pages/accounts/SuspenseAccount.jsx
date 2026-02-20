@@ -4,8 +4,9 @@ import Layout from '../../components/Layout'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
 import { ArrowLeft, Plus, X, Link as LinkIcon, RotateCcw, Trash2, Search } from 'lucide-react'
-import api from '../../api/api'
+import api from '../../api/client'
 import { getUsers } from '../../api/users'
+import client from '../../api/client'
 
 export default function SuspenseAccount() {
   const { user } = useAuthStore()
@@ -53,8 +54,8 @@ export default function SuspenseAccount() {
       const showReversed = filterStatus === 'reversed'
       
       const [paymentsRes, statsRes] = await Promise.all([
-        api.get(`/suspense/?show_matched=${showMatched}&show_reversed=${showReversed}`),
-        api.get('/suspense/stats')
+        client.get(`/suspense/?show_matched=${showMatched}&show_reversed=${showReversed}`),
+        client.get('/suspense/stats')
       ])
       setPayments(paymentsRes.data)
       setStats(statsRes.data)
@@ -77,7 +78,7 @@ export default function SuspenseAccount() {
 
   const loadCustomerLoans = async (customerId) => {
     try {
-      const response = await api.get(`/applications/user/${customerId}`)
+      const response = await client.get(`/applications/user/${customerId}`)
       // Filter only disbursed loans
       const disbursed = response.data.filter(loan => loan.status === 'disbursed')
       setCustomerLoans(disbursed)
@@ -90,7 +91,7 @@ export default function SuspenseAccount() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      await api.post('/suspense/', {
+      await client.post('/suspense/', {
         ...formData,
         amount: parseFloat(formData.amount)
       })
@@ -113,7 +114,7 @@ export default function SuspenseAccount() {
   const handleMatch = async (e) => {
     e.preventDefault()
     try {
-      await api.post(`/suspense/${showMatchModal.id}/match`, {
+      await client.post(`/suspense/${showMatchModal.id}/match`, {
         customer_id: parseInt(matchData.customer_id),
         loan_id: parseInt(matchData.loan_id)
       })
@@ -129,7 +130,7 @@ export default function SuspenseAccount() {
 
   const handleReverse = async () => {
     try {
-      await api.post(`/suspense/${showReverseModal.id}/reverse`, reverseData)
+      await client.post(`/suspense/${showReverseModal.id}/reverse`, reverseData)
       toast.success('Payment reversed!')
       setShowReverseModal(null)
       setReverseData({ reason: '' })
@@ -142,7 +143,7 @@ export default function SuspenseAccount() {
   const handleDelete = async (paymentId) => {
     if (!confirm('Delete this suspense payment?')) return
     try {
-      await api.delete(`/suspense/${paymentId}`)
+      await client.delete(`/suspense/${paymentId}`)
       toast.success('Payment deleted')
       loadData()
     } catch (error) {
