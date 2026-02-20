@@ -3,10 +3,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from app.config import settings
+from app.database import Base, engine
+from app.models.transit_account import TransitDeposit
+from app.models.suspense_account import SuspensePayment
 
 print("=== SERVER STARTED ===")
 print(f"Environment: {settings.ENVIRONMENT}")
 print(f"Debug Mode: {settings.DEBUG}")
+
+print("=== CREATING DATABASE TABLES ===")
+try:
+    Base.metadata.create_all(bind=engine)
+    print("✅ Tables created successfully")
+except Exception as e:
+    print(f"⚠️ Table creation error: {e}")
 
 app = FastAPI(
     title=settings.APP_NAME, 
