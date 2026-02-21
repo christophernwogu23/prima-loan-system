@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -12,15 +12,15 @@ class JournalEntry(Base):
     entry_date = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # The two accounts involved
-    debit_account_id = Column(Integer, ForeignKey("gl_accounts.id"), nullable=False)  # Account losing money
-    credit_account_id = Column(Integer, ForeignKey("gl_accounts.id"), nullable=False)  # Account gaining money
+    debit_account_id = Column(Integer, ForeignKey("gl_accounts.id"), nullable=False)
+    credit_account_id = Column(Integer, ForeignKey("gl_accounts.id"), nullable=False)
     
     amount = Column(Float, nullable=False)
     description = Column(Text, nullable=False)
-    reference = Column(String(200), nullable=True)  # Link to loan app, payment, etc.
+    reference = Column(String(200), nullable=True)
     
     # Auto vs Manual
-    is_auto_generated = Column(Boolean, default=False)  # True if system created, False if manual
+    is_auto_generated = Column(Boolean, default=False)
     
     # Who created it
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
