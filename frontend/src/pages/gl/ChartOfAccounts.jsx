@@ -22,12 +22,12 @@ export default function ChartOfAccounts() {
   })
 
   const accountTypes = [
-    { value: 'asset', label: 'Asset', color: 'text-blue-600 dark:text-blue-400' },
-    { value: 'liability', label: 'Liability', color: 'text-red-600 dark:text-red-400' },
-    { value: 'equity', label: 'Equity', color: 'text-purple-600 dark:text-purple-400' },
-    { value: 'income', label: 'Income', color: 'text-green-600 dark:text-green-400' },
-    { value: 'expense', label: 'Expense', color: 'text-orange-600 dark:text-orange-400' }
-  ]
+  { value: 'asset', label: 'Assets', color: 'text-blue-600 dark:text-blue-400' },
+  { value: 'liability', label: 'Liabilities', color: 'text-red-600 dark:text-red-400' },
+  { value: 'equity', label: 'Equity', color: 'text-purple-600 dark:text-purple-400' },
+  { value: 'income', label: 'Income', color: 'text-green-600 dark:text-green-400' },
+  { value: 'expense', label: 'Expenses', color: 'text-orange-600 dark:text-orange-400' }
+]
 
   useEffect(() => {
     loadAccounts()
@@ -126,7 +126,7 @@ export default function ChartOfAccounts() {
               group.accounts.length > 0 && (
                 <div key={group.value} className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg overflow-hidden">
                   <div className="bg-gray-50 dark:bg-gray-700 px-6 py-3 border-b dark:border-gray-600">
-                    <h3 className={`font-semibold ${group.color}`}>{group.label}s</h3>
+                    <h3 className={`font-semibold ${group.color}`}>{group.label}</h3>
                   </div>
                   <table className="w-full">
                     <thead className="bg-gray-50 dark:bg-gray-700/50 border-b dark:border-gray-600">
