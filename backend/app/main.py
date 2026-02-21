@@ -3,9 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from app.config import settings
-from app.database import Base, engine
+from app.database import Base, engine, SessionLocal
+
+# Import models so they're registered with Base
 from app.models.transit_account import TransitDeposit
 from app.models.suspense_account import SuspensePayment
+from app.models.gl_account import GLAccount
+from app.models.journal_entry import JournalEntry
 
 print("=== SERVER STARTED ===")
 print(f"Environment: {settings.ENVIRONMENT}")
@@ -18,6 +22,64 @@ try:
 except Exception as e:
     print(f"⚠️ Table creation error: {e}")
 
+# Create default GL accounts
+def create_default_gl_accounts():
+    """Create default Chart of Accounts if they don't exist"""
+    db = SessionLocal()
+    
+    default_accounts = [
+        # ASSETS
+        {"code": "1001", "name": "Bank Account", "type": "asset", "desc": "Main company bank account"},
+        {"code": "1002", "name": "Cash on Hand", "type": "asset", "desc": "Physical cash"},
+        {"code": "1003", "name": "Loans Receivable", "type": "asset", "desc": "Money owed by customers"},
+        {"code": "1004", "name": "Office Equipment", "type": "asset", "desc": "Computers, furniture"},
+        {"code": "1005", "name": "Vehicles", "type": "asset", "desc": "Company vehicles"},
+        
+        # LIABILITIES
+        {"code": "2001", "name": "Customer Savings", "type": "liability", "desc": "Customer deposits"},
+        {"code": "2002", "name": "Fixed Deposits", "type": "liability", "desc": "Customer fixed deposits"},
+        
+        # EQUITY
+        {"code": "3001", "name": "Shareholder Capital", "type": "equity", "desc": "Shareholder investments"},
+        {"code": "3002", "name": "Retained Earnings", "type": "equity", "desc": "Accumulated profits"},
+        
+        # INCOME
+        {"code": "4001", "name": "Interest Income", "type": "income", "desc": "Interest from loans"},
+        {"code": "4002", "name": "Upfront Fee Income", "type": "income", "desc": "Processing fees"},
+        
+        # EXPENSES
+        {"code": "5001", "name": "Salary Expense", "type": "expense", "desc": "Staff salaries"},
+        {"code": "5002", "name": "Rent Expense", "type": "expense", "desc": "Office rent"},
+        {"code": "5003", "name": "General Expenses", "type": "expense", "desc": "Other expenses"},
+    ]
+    
+    for acc in default_accounts:
+        existing = db.query(GLAccount).filter(GLAccount.account_code == acc["code"]).first()
+        if not existing:
+            gl_account = GLAccount(
+                account_code=acc["code"],
+                account_name=acc["name"],
+                account_type=acc["type"],
+                description=acc["desc"],
+                current_balance=0.0
+            )
+            db.add(gl_account)
+    
+    try:
+        db.commit()
+        print("✅ Default GL accounts created/verified")
+    except Exception as e:
+        print(f"⚠️ GL account setup error: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+# Create default accounts
+try:
+    create_default_gl_accounts()
+except Exception as e:
+    print(f"⚠️ Error in GL setup: {e}")
+
 app = FastAPI(
     title=settings.APP_NAME, 
     version=settings.APP_VERSION,
@@ -26,7 +88,7 @@ app = FastAPI(
 
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
-# CORS Configuration - Dynamic based on environment
+# CORS Configuration
 cors_kwargs = {
     "allow_origins": settings.cors_origins,
     "allow_credentials": True,
@@ -34,13 +96,10 @@ cors_kwargs = {
     "allow_headers": ["*"],
 }
 
-# Add regex for Vercel preview deployments in production
 if settings.cors_origin_regex:
     cors_kwargs["allow_origin_regex"] = settings.cors_origin_regex
 
 app.add_middleware(CORSMiddleware, **cors_kwargs)
-
-# Compress responses
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Security Headers
@@ -116,6 +175,12 @@ app.include_router(transit_router, prefix="/api/v1")
 
 from app.api.v1.suspense_account import router as suspense_router
 app.include_router(suspense_router, prefix="/api/v1")
+
+print("=== LOADING GL ROUTER ===", flush=True)
+from app.api.v1.general_ledger import router as gl_router
+print("=== GL ROUTER LOADED ===", flush=True)
+app.include_router(gl_router, prefix="/api/v1")
+print("=== GL ROUTER REGISTERED ===", flush=True)
 
 @app.get("/health")
 async def health():
