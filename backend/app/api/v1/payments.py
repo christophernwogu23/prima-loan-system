@@ -19,7 +19,6 @@ def create_payment(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new payment"""
-    # Verify loan exists and is disbursed
     loan = db.query(LoanApplication).filter(
         LoanApplication.id == payment.loan_application_id
     ).first()
@@ -30,16 +29,14 @@ def create_payment(
     if loan.status != "disbursed":
         raise HTTPException(status_code=400, detail="Can only record payments for disbursed loans")
     
-    # Loan officers can only create payments for their assigned customers
     if current_user.role == "loan_officer":
         if loan.assigned_officer_id != current_user.id:
             raise HTTPException(status_code=403, detail="Access denied - loan not assigned to you")
     
-    # If payment method is savings_account, verify and deduct from savings
+    # If payment method is savings_account, verify and deduct
     if payment.payment_method == "savings_account":
         from app.models.savings import Savings
         
-        # Get customer's savings account
         savings = db.query(Savings).filter(Savings.user_id == loan.customer_id).first()
         
         if not savings:
@@ -51,7 +48,6 @@ def create_payment(
                 detail=f"Insufficient savings balance. Available: ₦{savings.balance:,.2f}"
             )
         
-        # Deduct from savings
         savings.balance -= payment.amount
         db.add(savings)
     
@@ -68,6 +64,24 @@ def create_payment(
     db.add(db_payment)
     db.commit()
     db.refresh(db_payment)
+    
+    # AUTO-INTEGRATION: Create GL entry when payment is recorded
+    try:
+        from app.api.v1.general_ledger import auto_create_journal_entry
+        
+        auto_create_journal_entry(
+            db=db,
+            debit_account_code="1001",  # Bank Account
+            credit_account_code="1003",  # Loans Receivable
+            amount=payment.amount,
+            description=f"Payment received - {loan.application_number}",
+            reference=f"PMT-{db_payment.id}",
+            created_by_id=current_user.id
+        )
+        print(f"✓ Auto-created GL entry for payment {db_payment.id}")
+    except Exception as e:
+        print(f"⚠️ Failed to create GL entry: {e}")
+        # Don't fail the payment if GL entry fails
     
     return db_payment
     

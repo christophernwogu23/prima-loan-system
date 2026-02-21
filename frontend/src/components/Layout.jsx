@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { 
   Package, FileText, Users, CreditCard, LogOut, 
   PlusCircle, ClipboardList, BarChart3, Settings, Receipt, Wallet, 
-  Landmark, Upload, UserCheck, AlertTriangle, Bell, Moon, Sun, Menu, X
+  Landmark, Upload, UserCheck, AlertTriangle, Bell, Moon, Sun, Menu, X, BookOpen
 } from 'lucide-react'
 import { getMyNotifications, markAllAsRead } from '../api/notifications'
 import { useTheme } from '../context/ThemeContext'
@@ -128,6 +128,8 @@ export default function Layout({ children }) {
     { path: '/expenses', label: 'Expenses', icon: Wallet },
     { path: '/fixed-deposits', label: 'Fixed Deposits', icon: Landmark },
     { path: '/shareholders', label: 'Shareholders', icon: UserCheck },
+    { path: '/gl/chart-of-accounts', label: 'Chart of Accounts', icon: BookOpen },
+    { path: '/gl/journal-entries', label: 'Journal Entries', icon: BookOpen },
   ],
   ceo: [
     { path: '/dashboard', label: 'Dashboard', icon: CreditCard },
@@ -141,6 +143,8 @@ export default function Layout({ children }) {
     { path: '/expenses', label: 'Expenses', icon: Wallet },
     { path: '/fixed-deposits', label: 'Fixed Deposits', icon: Landmark },
     { path: '/shareholders', label: 'Shareholders', icon: UserCheck },
+    { path: '/gl/chart-of-accounts', label: 'Chart of Accounts', icon: BookOpen },
+    { path: '/gl/journal-entries', label: 'Journal Entries', icon: BookOpen },
   ],
   admin: [
     { path: '/dashboard', label: 'Dashboard', icon: CreditCard },
@@ -154,6 +158,8 @@ export default function Layout({ children }) {
     { path: '/expenses', label: 'Expenses', icon: Wallet },
     { path: '/fixed-deposits', label: 'Fixed Deposits', icon: Landmark },
     { path: '/shareholders', label: 'Shareholders', icon: UserCheck },
+    { path: '/gl/chart-of-accounts', label: 'Chart of Accounts', icon: BookOpen },
+    { path: '/gl/journal-entries', label: 'Journal Entries', icon: BookOpen },
     { path: '/import', label: 'Import Data', icon: Upload },
     { path: '/customer-assignment', label: 'Customer Assignment', icon: UserCheck },
   ],

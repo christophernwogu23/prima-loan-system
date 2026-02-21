@@ -25,6 +25,9 @@ import TransitAccount from './pages/accounts/TransitAccount'
 import SuspenseAccount from './pages/accounts/SuspenseAccount'
 import LoansAccount from './pages/accounts/LoansAccount'
 import SavingsAccount from './pages/accounts/SavingsAccount'
+import ChartOfAccounts from './pages/gl/ChartOfAccounts'
+import JournalEntries from './pages/gl/JournalEntries'
+import AccountDetail from './pages/gl/AccountDetail'
 
 
 function ProtectedRoute({ children }) {
@@ -62,6 +65,9 @@ export default function App() {
           <Route path="/accounts/suspense" element={<ProtectedRoute><SuspenseAccount /></ProtectedRoute>} />
           <Route path="/accounts/loans" element={<ProtectedRoute><LoansAccount /></ProtectedRoute>} />
           <Route path="/accounts/savings" element={<ProtectedRoute><SavingsAccount /></ProtectedRoute>} />
+          <Route path="/gl/chart-of-accounts" element={<ProtectedRoute><ChartOfAccounts /></ProtectedRoute>} />
+          <Route path="/gl/journal-entries" element={<ProtectedRoute><JournalEntries /></ProtectedRoute>} />
+          <Route path="/gl/accounts/:accountId" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
                     
         </Routes>
         <Toaster position="top-right" />

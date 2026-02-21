@@ -265,7 +265,7 @@ async def review_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Review application"""
+    """Review an application"""
     application = db.query(LoanApplication).filter(LoanApplication.id == app_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -314,6 +314,25 @@ async def review_application(
             application.status = "disbursed"
             application.approved_amount = application.requested_amount
             application.approved_at = datetime.utcnow()
+            
+            # AUTO-INTEGRATION: Create GL entry when loan is disbursed
+            try:
+                from app.api.v1.general_ledger import auto_create_journal_entry
+                
+                auto_create_journal_entry(
+                    db=db,
+                    debit_account_code="1003",  # Loans Receivable
+                    credit_account_code="1001",  # Bank Account
+                    amount=application.requested_amount,
+                    description=f"Loan disbursed: {application.application_number}",
+                    reference=application.application_number,
+                    created_by_id=current_user.id
+                )
+                print(f"✓ Auto-created GL entry for loan {application.application_number}")
+            except Exception as e:
+                print(f"⚠️ Failed to create GL entry: {e}")
+                # Don't fail the loan approval if GL entry fails
+            
         elif action == "reject":
             application.status = "rejected"
         else:
