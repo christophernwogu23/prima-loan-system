@@ -6,8 +6,8 @@ from app.models import User
 from app.models.loan_application import LoanApplication
 from app.models.payment import Payment
 from app.models.savings import Savings
-from app.models.transit_account import TransitDeposit  # NEW
-from app.models.suspense_account import SuspensePayment  # NEW
+from app.models.transit_account import TransitDeposit
+from app.models.suspense_account import SuspensePayment
 
 router = APIRouter(prefix="/accounts", tags=["Accounts"])
 
@@ -18,7 +18,7 @@ async def get_account_stats(
 ):
     """Get overview stats for all accounts"""
     
-    # Loans Account
+    # Loans Account Stats
     disbursed_loans = db.query(LoanApplication).filter(
         LoanApplication.status == "disbursed"
     ).all()
@@ -27,18 +27,18 @@ async def get_account_stats(
     total_repaid = db.query(func.sum(Payment.amount)).scalar() or 0
     loans_balance = total_disbursed - total_repaid
     
-    # Savings Account
+    # Savings Account Stats
     total_savings = db.query(func.sum(Savings.balance)).scalar() or 0
     savings_count = db.query(func.count(Savings.id)).scalar() or 0
     
-    # Transit Account - pending deposits
+    # Transit Account Stats - only pending (not yet banked)
     pending_transit = db.query(TransitDeposit).filter(
         TransitDeposit.deposited_to_bank == False
     ).all()
     transit_balance = sum(d.amount for d in pending_transit)
     transit_count = len(pending_transit)
     
-    # Suspense Account - unmatched payments
+    # Suspense Account Stats - only unmatched and not reversed
     unmatched_suspense = db.query(SuspensePayment).filter(
         SuspensePayment.matched == False,
         SuspensePayment.reversed == False
