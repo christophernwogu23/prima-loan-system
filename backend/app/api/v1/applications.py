@@ -402,7 +402,7 @@ async def delete_application(
     db.commit()
     return {"message": "Application deleted successfully", "id": application_id}
 
-    @router.get("/{app_id}/offer-letter")
+@router.get("/{app_id}/offer-letter")
 async def get_offer_letter(
     app_id: int,
     db: Session = Depends(get_db),
