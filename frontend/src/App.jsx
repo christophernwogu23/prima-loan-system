@@ -28,6 +28,9 @@ import SavingsAccount from './pages/accounts/SavingsAccount'
 import ChartOfAccounts from './pages/gl/ChartOfAccounts'
 import JournalEntries from './pages/gl/JournalEntries'
 import AccountDetail from './pages/gl/AccountDetail'
+import OfferLetter from './pages/loans/OfferLetter'
+
+
 
 
 function ProtectedRoute({ children }) {
@@ -68,6 +71,8 @@ export default function App() {
           <Route path="/gl/chart-of-accounts" element={<ProtectedRoute><ChartOfAccounts /></ProtectedRoute>} />
           <Route path="/gl/journal-entries" element={<ProtectedRoute><JournalEntries /></ProtectedRoute>} />
           <Route path="/gl/accounts/:accountId" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
+          <Route path="/applications/:id/offer-letter" element={<OfferLetter />} />
+
                     
         </Routes>
         <Toaster position="top-right" />

@@ -401,3 +401,69 @@ async def delete_application(
     db.delete(application)
     db.commit()
     return {"message": "Application deleted successfully", "id": application_id}
+
+    @router.get("/{app_id}/offer-letter")
+async def get_offer_letter(
+    app_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Generate offer letter data for a loan application"""
+    if current_user.role not in ["admin", "ceo", "manager", "loan_officer"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    application = db.query(LoanApplication).filter(LoanApplication.id == app_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    if application.status not in ["manager_approved", "disbursed"]:
+        raise HTTPException(status_code=400, detail="Offer letter only available for approved or disbursed loans")
+
+    customer = db.query(User).filter(User.id == application.customer_id).first()
+    product = db.query(LoanProduct).filter(LoanProduct.id == application.loan_product_id).first()
+
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    # Use approved amount if disbursed, otherwise requested amount
+    principal = application.approved_amount or application.requested_amount
+    interest_rate = application.interest_rate or product.interest_rate
+    tenure_months = application.tenure_months
+
+    # Calculations
+    interest_amount = principal * (interest_rate / 100)
+    total_amount = principal + interest_amount
+    monthly_repayment = total_amount / tenure_months
+
+    # Dates
+    from datetime import timedelta
+    from dateutil.relativedelta import relativedelta
+
+    letter_date = application.approved_at or application.created_at
+    first_repayment_date = letter_date + relativedelta(months=1)
+    due_date = letter_date + relativedelta(months=tenure_months)
+
+    return {
+        "letter_date": letter_date.strftime("%d/%m/%Y"),
+        "customer": {
+            "name": f"{customer.first_name} {customer.last_name}".upper(),
+            "address": getattr(customer, "address", "") or "",
+            "city": getattr(customer, "city", "") or "",
+            "state": getattr(customer, "state", "") or "",
+        },
+        "application_number": application.application_number,
+        "loan": {
+            "principal": principal,
+            "interest_rate": interest_rate,
+            "interest_amount": interest_amount,
+            "total_amount": total_amount,
+            "tenure_months": tenure_months,
+            "monthly_repayment": monthly_repayment,
+            "first_repayment_date": first_repayment_date.strftime("%d/%m/%Y"),
+            "due_date": due_date.strftime("%d/%m/%Y"),
+            "product_name": product.name if product else "PERSONAL LOAN",
+            "risk_premium_rate": 2,
+            "admin_fee_rate": 1,
+            "default_rate": 2,
+        }
+    }
