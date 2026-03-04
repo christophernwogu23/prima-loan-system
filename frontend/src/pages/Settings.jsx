@@ -1,50 +1,44 @@
 import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
+import { useAuthStore } from '../store/authStore'
 import { getSettings, updateSettings } from '../api/settings'
-import { Building2, CreditCard, Settings as SettingsIcon, Save, Loader2 } from 'lucide-react'
+import client from '../api/client'
+import { Building2, CreditCard, Settings as SettingsIcon, Save, Loader2, Lock, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Settings() {
+  const { user } = useAuthStore()
   const [settings, setSettings] = useState({
-    // Company Info
-    company_name: 'PRIMA',
-    company_address: '',
-    company_phone: '',
-    company_logo: '',
-    // Loan Settings
-    default_interest_rate: '17.0',
-    max_loan_amount: '10000000',
-    min_loan_amount: '10000',
-    late_payment_penalty: '5.0',
-    // System Settings
-    currency: 'NGN',
-    currency_symbol: '₦',
-    date_format: 'DD/MM/YYYY',
-    force_password_change: 'true'
+    company_name: 'PRIMA', company_address: '', company_phone: '',
+    company_logo: '', default_interest_rate: '17.0', max_loan_amount: '10000000',
+    min_loan_amount: '10000', late_payment_penalty: '5.0',
+    currency: 'NGN', currency_symbol: '₦', date_format: 'DD/MM/YYYY', force_password_change: 'true'
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState('company')
 
-  useEffect(() => {
-    loadSettings()
-  }, [])
+  // Change password state
+  const [pwForm, setPwForm] = useState({ current_password: '', new_password: '', confirm_password: '' })
+  const [pwLoading, setPwLoading] = useState(false)
+  const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false })
+
+  const isAdmin = user?.role === 'admin'
+
+  useEffect(() => { loadSettings() }, [])
 
   const loadSettings = async () => {
     try {
       const data = await getSettings()
       setSettings(data)
     } catch (error) {
-      console.error('Failed to load settings:', error)
       toast.error('Failed to load settings')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleChange = (key, value) => {
-    setSettings({ ...settings, [key]: value })
-  }
+  const handleChange = (key, value) => setSettings({ ...settings, [key]: value })
 
   const handleSave = async () => {
     setSaving(true)
@@ -58,28 +52,64 @@ export default function Settings() {
     }
   }
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-NG', {
-      style: 'currency',
-      currency: 'NGN'
-    }).format(amount)
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    if (pwForm.new_password !== pwForm.confirm_password)
+      return toast.error('New passwords do not match')
+    if (pwForm.new_password.length < 6)
+      return toast.error('Password must be at least 6 characters')
+
+    setPwLoading(true)
+    try {
+      await client.post('/auth/change-password', {
+        current_password: pwForm.current_password,
+        new_password: pwForm.new_password
+      })
+      toast.success('Password changed successfully!')
+      setPwForm({ current_password: '', new_password: '', confirm_password: '' })
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to change password')
+    } finally {
+      setPwLoading(false)
+    }
   }
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      </Layout>
-    )
-  }
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount)
+
+  if (loading) return (
+    <Layout>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    </Layout>
+  )
 
   const tabs = [
-    { id: 'company', label: 'Company Info', icon: Building2 },
-    { id: 'loan', label: 'Loan Settings', icon: CreditCard },
-    { id: 'system', label: 'System Settings', icon: SettingsIcon }
+    ...(isAdmin ? [
+      { id: 'company', label: 'Company Info', icon: Building2 },
+      { id: 'loan', label: 'Loan Settings', icon: CreditCard },
+      { id: 'system', label: 'System Settings', icon: SettingsIcon },
+    ] : []),
+    { id: 'security', label: 'Security', icon: Lock },
   ]
+
+  const PwInput = ({ field, placeholder }) => (
+    <div className="relative">
+      <input
+        type={showPw[field] ? 'text' : 'password'}
+        value={pwForm[field === 'current' ? 'current_password' : field === 'new' ? 'new_password' : 'confirm_password']}
+        onChange={e => setPwForm({ ...pwForm, [field === 'current' ? 'current_password' : field === 'new' ? 'new_password' : 'confirm_password']: e.target.value })}
+        className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 pr-10 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        placeholder={placeholder}
+        required
+      />
+      <button type="button" onClick={() => setShowPw({ ...showPw, [field]: !showPw[field] })}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+        {showPw[field] ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
+  )
 
   return (
     <Layout>
@@ -89,37 +119,28 @@ export default function Settings() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
             <p className="text-gray-600 dark:text-gray-400">Configure your system preferences</p>
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
-            {saving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            Save Changes
-          </button>
+          {isAdmin && activeTab !== 'security' && (
+            <button onClick={handleSave} disabled={saving}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save Changes
+            </button>
+          )}
         </div>
 
         {/* Tabs */}
         <div className="border-b dark:border-gray-700">
           <nav className="flex gap-4">
-            {tabs.map((tab) => {
+            {tabs.map(tab => {
               const Icon = tab.icon
               return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                     activeTab === tab.id
                       ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                       : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
+                  }`}>
+                  <Icon className="w-4 h-4" />{tab.label}
                 </button>
               )
             })}
@@ -127,65 +148,32 @@ export default function Settings() {
         </div>
 
         {/* Company Info Tab */}
-        {activeTab === 'company' && (
+        {activeTab === 'company' && isAdmin && (
           <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold mb-4 dark:text-white">Company Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Company Name
-                </label>
-                <input
-                  type="text"
-                  value={settings.company_name}
-                  onChange={(e) => handleChange('company_name', e.target.value)}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter company name"
-                />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Company Name</label>
+                <input type="text" value={settings.company_name} onChange={e => handleChange('company_name', e.target.value)}
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Phone Number
-                </label>
-                <input
-                  type="text"
-                  value={settings.company_phone}
-                  onChange={(e) => handleChange('company_phone', e.target.value)}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter phone number"
-                />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number</label>
+                <input type="text" value={settings.company_phone} onChange={e => handleChange('company_phone', e.target.value)}
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Address
-                </label>
-                <textarea
-                  value={settings.company_address}
-                  onChange={(e) => handleChange('company_address', e.target.value)}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={3}
-                  placeholder="Enter company address"
-                />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Address</label>
+                <textarea value={settings.company_address} onChange={e => handleChange('company_address', e.target.value)}
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" rows={3} />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Logo URL
-                </label>
-                <input
-                  type="text"
-                  value={settings.company_logo}
-                  onChange={(e) => handleChange('company_logo', e.target.value)}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter logo URL (optional)"
-                />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Logo URL</label>
+                <input type="text" value={settings.company_logo} onChange={e => handleChange('company_logo', e.target.value)}
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 {settings.company_logo && (
                   <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                    <img 
-                      src={settings.company_logo} 
-                      alt="Company Logo" 
-                      className="h-16 object-contain"
-                      onError={(e) => e.target.style.display = 'none'}
-                    />
+                    <img src={settings.company_logo} alt="Logo" className="h-16 object-contain" onError={e => e.target.style.display = 'none'} />
                   </div>
                 )}
               </div>
@@ -194,127 +182,114 @@ export default function Settings() {
         )}
 
         {/* Loan Settings Tab */}
-        {activeTab === 'loan' && (
+        {activeTab === 'loan' && isAdmin && (
           <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold mb-4 dark:text-white">Loan Settings</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Default Interest Rate (%)
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={settings.default_interest_rate}
-                  onChange={(e) => handleChange('default_interest_rate', e.target.value)}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Applied to new loan products by default
-                </p>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Interest Rate (%)</label>
+                <input type="number" step="0.1" value={settings.default_interest_rate} onChange={e => handleChange('default_interest_rate', e.target.value)}
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Late Payment Penalty (%)
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={settings.late_payment_penalty}
-                  onChange={(e) => handleChange('late_payment_penalty', e.target.value)}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Penalty applied for overdue payments
-                </p>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Late Payment Penalty (%)</label>
+                <input type="number" step="0.1" value={settings.late_payment_penalty} onChange={e => handleChange('late_payment_penalty', e.target.value)}
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Minimum Loan Amount (₦)
-                </label>
-                <input
-                  type="number"
-                  value={settings.min_loan_amount}
-                  onChange={(e) => handleChange('min_loan_amount', e.target.value)}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Currently: {formatCurrency(parseFloat(settings.min_loan_amount) || 0)}
-                </p>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Minimum Loan Amount (₦)</label>
+                <input type="number" value={settings.min_loan_amount} onChange={e => handleChange('min_loan_amount', e.target.value)}
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <p className="text-xs text-gray-500 mt-1">{formatCurrency(parseFloat(settings.min_loan_amount) || 0)}</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Maximum Loan Amount (₦)
-                </label>
-                <input
-                  type="number"
-                  value={settings.max_loan_amount}
-                  onChange={(e) => handleChange('max_loan_amount', e.target.value)}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Currently: {formatCurrency(parseFloat(settings.max_loan_amount) || 0)}
-                </p>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Maximum Loan Amount (₦)</label>
+                <input type="number" value={settings.max_loan_amount} onChange={e => handleChange('max_loan_amount', e.target.value)}
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <p className="text-xs text-gray-500 mt-1">{formatCurrency(parseFloat(settings.max_loan_amount) || 0)}</p>
               </div>
             </div>
           </div>
         )}
 
         {/* System Settings Tab */}
-        {activeTab === 'system' && (
+        {activeTab === 'system' && isAdmin && (
           <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold mb-4 dark:text-white">System Settings</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Currency
-                </label>
-                <select
-                  value={settings.currency}
-                  onChange={(e) => {
-                    handleChange('currency', e.target.value)
-                    if (e.target.value === 'NGN') handleChange('currency_symbol', '₦')
-                    if (e.target.value === 'USD') handleChange('currency_symbol', '$')
-                    if (e.target.value === 'GBP') handleChange('currency_symbol', '£')
-                  }}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Currency</label>
+                <select value={settings.currency} onChange={e => {
+                  handleChange('currency', e.target.value)
+                  if (e.target.value === 'NGN') handleChange('currency_symbol', '₦')
+                  if (e.target.value === 'USD') handleChange('currency_symbol', '$')
+                  if (e.target.value === 'GBP') handleChange('currency_symbol', '£')
+                }} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="NGN">Nigerian Naira (₦)</option>
                   <option value="USD">US Dollar ($)</option>
                   <option value="GBP">British Pound (£)</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Date Format
-                </label>
-                <select
-                  value={settings.date_format}
-                  onChange={(e) => handleChange('date_format', e.target.value)}
-                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="DD/MM/YYYY">DD/MM/YYYY (31/12/2025)</option>
-                  <option value="MM/DD/YYYY">MM/DD/YYYY (12/31/2025)</option>
-                  <option value="YYYY-MM-DD">YYYY-MM-DD (2025-12-31)</option>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date Format</label>
+                <select value={settings.date_format} onChange={e => handleChange('date_format', e.target.value)}
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
                 </select>
               </div>
               <div className="md:col-span-2">
                 <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.force_password_change === 'true'}
-                    onChange={(e) => handleChange('force_password_change', e.target.checked ? 'true' : 'false')}
-                    className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:bg-gray-700"
-                  />
+                  <input type="checkbox" checked={settings.force_password_change === 'true'}
+                    onChange={e => handleChange('force_password_change', e.target.checked ? 'true' : 'false')}
+                    className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:bg-gray-700" />
                   <div>
                     <span className="font-medium text-gray-700 dark:text-white">Force password change on first login</span>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      New users will be required to change their password when they first log in
-                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">New users must change password on first login</p>
                   </div>
                 </label>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Security Tab - available to ALL users */}
+        {activeTab === 'security' && (
+          <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow p-6 max-w-md">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <Lock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold dark:text-white">Change Password</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Update your account password</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Password</label>
+                <PwInput field="current" placeholder="Enter current password" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password</label>
+                <PwInput field="new" placeholder="Enter new password" />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Minimum 6 characters</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm New Password</label>
+                <PwInput field="confirm" placeholder="Confirm new password" />
+                {pwForm.confirm_password && pwForm.new_password !== pwForm.confirm_password && (
+                  <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                )}
+              </div>
+              <button type="submit" disabled={pwLoading}
+                className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 mt-2">
+                {pwLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                {pwLoading ? 'Changing Password...' : 'Change Password'}
+              </button>
+            </form>
           </div>
         )}
       </div>

@@ -88,3 +88,29 @@ async def refresh_token(request: RefreshRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@router.post("/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Change the current user's password"""
+    if not verify_password(request.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+
+    if request.current_password == request.new_password:
+        raise HTTPException(status_code=400, detail="New password must be different from current password")
+
+    from app.core.security import get_password_hash
+    current_user.hashed_password = get_password_hash(request.new_password)
+    db.commit()
+
+    return {"message": "Password changed successfully"}
