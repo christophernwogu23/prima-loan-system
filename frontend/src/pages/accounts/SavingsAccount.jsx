@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuthStore } from '../../store/authStore'
 import { ArrowLeft, Users, TrendingUp, ArrowDownCircle, ArrowUpCircle, Trash2, X } from 'lucide-react'
-import api from '../../api/api'
+import client from '../../api/client'
 import toast from 'react-hot-toast'
 
 const formatCurrency = (amount) =>
@@ -35,8 +35,8 @@ export default function SavingsAccount() {
     setLoading(true)
     try {
       const [savRes, usersRes] = await Promise.all([
-        api.get('/savings/'),
-        api.get('/users/?role=customer')
+        client.get('/savings/'),
+        client.get('/users/?role=customer')
       ])
 
       // Build a map of user_id -> customer name
@@ -71,7 +71,7 @@ export default function SavingsAccount() {
 
     setTxLoading(true)
     try {
-      await api.post(`/savings/${txModal.type}`, {
+      await client.post(`/savings/${txModal.type}`, {
         user_id: txModal.user_id,
         amount,
         note: txNote || null
@@ -90,7 +90,7 @@ export default function SavingsAccount() {
     if (!deleteModal) return
     setDeleting(true)
     try {
-      await api.delete(`/savings/${deleteModal.user_id}`)
+      await client.delete(`/savings/${deleteModal.user_id}`)
       toast.success('Savings account deleted')
       setDeleteModal(null)
       loadData()
