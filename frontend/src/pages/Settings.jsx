@@ -94,22 +94,7 @@ export default function Settings() {
     { id: 'security', label: 'Security', icon: Lock },
   ]
 
-  const PwInput = ({ field, placeholder }) => (
-    <div className="relative">
-      <input
-        type={showPw[field] ? 'text' : 'password'}
-        value={pwForm[field === 'current' ? 'current_password' : field === 'new' ? 'new_password' : 'confirm_password']}
-        onChange={e => setPwForm({ ...pwForm, [field === 'current' ? 'current_password' : field === 'new' ? 'new_password' : 'confirm_password']: e.target.value })}
-        className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 pr-10 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        placeholder={placeholder}
-        required
-      />
-      <button type="button" onClick={() => setShowPw({ ...showPw, [field]: !showPw[field] })}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-        {showPw[field] ? <EyeOff size={16} /> : <Eye size={16} />}
-      </button>
-    </div>
-  )
+
 
   return (
     <Layout>
@@ -270,16 +255,43 @@ export default function Settings() {
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Password</label>
-                <PwInput field="current" placeholder="Enter current password" />
+                <div className="relative">
+                  <input type={showPw.current ? 'text' : 'password'} value={pwForm.current_password}
+                    onChange={e => setPwForm({ ...pwForm, current_password: e.target.value })}
+                    className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 pr-10 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter current password" required />
+                  <button type="button" onClick={() => setShowPw({ ...showPw, current: !showPw.current })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showPw.current ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password</label>
-                <PwInput field="new" placeholder="Enter new password" />
+                <div className="relative">
+                  <input type={showPw.new ? 'text' : 'password'} value={pwForm.new_password}
+                    onChange={e => setPwForm({ ...pwForm, new_password: e.target.value })}
+                    className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 pr-10 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter new password" required />
+                  <button type="button" onClick={() => setShowPw({ ...showPw, new: !showPw.new })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showPw.new ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Minimum 6 characters</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm New Password</label>
-                <PwInput field="confirm" placeholder="Confirm new password" />
+                <div className="relative">
+                  <input type={showPw.confirm ? 'text' : 'password'} value={pwForm.confirm_password}
+                    onChange={e => setPwForm({ ...pwForm, confirm_password: e.target.value })}
+                    className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 pr-10 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Confirm new password" required />
+                  <button type="button" onClick={() => setShowPw({ ...showPw, confirm: !showPw.confirm })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showPw.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
                 {pwForm.confirm_password && pwForm.new_password !== pwForm.confirm_password && (
                   <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
                 )}
