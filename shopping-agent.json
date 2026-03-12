@@ -1,0 +1,267 @@
+{
+  "nodes": [
+    {
+      "id": "chatOpenAI_0",
+      "position": { "x": 900, "y": 80 },
+      "type": "customNode",
+      "data": {
+        "id": "chatOpenAI_0",
+        "label": "ChatOpenAI",
+        "version": 6,
+        "name": "chatOpenAI",
+        "type": "ChatOpenAI",
+        "baseClasses": ["ChatOpenAI", "BaseChatModel", "BaseLanguageModel", "Runnable"],
+        "category": "Chat Models",
+        "description": "Wrapper around OpenAI large language models that use the Chat endpoint",
+        "inputParams": [
+          { "label": "Connect Credential", "name": "credential", "type": "credential", "credentialNames": ["openAIApi"] },
+          { "label": "Model Name", "name": "modelName", "type": "asyncOptions", "default": "gpt-4o" },
+          { "label": "Temperature", "name": "temperature", "type": "number", "default": 0.9 }
+        ],
+        "inputAnchors": [],
+        "inputs": {
+          "modelName": "gpt-4o",
+          "temperature": "0.3"
+        },
+        "outputAnchors": [
+          {
+            "id": "chatOpenAI_0-output-chatOpenAI-ChatOpenAI|BaseChatModel|BaseLanguageModel|Runnable",
+            "name": "chatOpenAI",
+            "label": "ChatOpenAI",
+            "type": "ChatOpenAI | BaseChatModel | BaseLanguageModel | Runnable"
+          }
+        ],
+        "outputs": {},
+        "selected": false
+      },
+      "width": 300,
+      "height": 670,
+      "selected": false,
+      "positionAbsolute": { "x": 900, "y": 80 },
+      "dragging": false
+    },
+    {
+      "id": "bufferWindowMemory_0",
+      "position": { "x": 100, "y": 80 },
+      "type": "customNode",
+      "data": {
+        "id": "bufferWindowMemory_0",
+        "label": "Buffer Window Memory",
+        "version": 1,
+        "name": "bufferWindowMemory",
+        "type": "BufferWindowMemory",
+        "baseClasses": ["BufferWindowMemory", "BaseChatMemory", "BaseMemory"],
+        "category": "Memory",
+        "description": "Uses a window of size k to surface the last k back-and-forth to use as memory",
+        "inputParams": [
+          { "label": "Size", "name": "k", "type": "number", "default": 10 },
+          { "label": "Session Id", "name": "sessionId", "type": "string", "default": "" },
+          { "label": "Memory Key", "name": "memoryKey", "type": "string", "default": "chat_history" }
+        ],
+        "inputAnchors": [],
+        "inputs": {
+          "k": 10,
+          "memoryKey": "chat_history",
+          "sessionId": ""
+        },
+        "outputAnchors": [
+          {
+            "id": "bufferWindowMemory_0-output-bufferWindowMemory-BufferWindowMemory|BaseChatMemory|BaseMemory",
+            "name": "bufferWindowMemory",
+            "label": "Buffer Window Memory",
+            "type": "BufferWindowMemory | BaseChatMemory | BaseMemory"
+          }
+        ],
+        "outputs": {},
+        "selected": false
+      },
+      "width": 300,
+      "height": 430,
+      "selected": false,
+      "positionAbsolute": { "x": 100, "y": 80 },
+      "dragging": false
+    },
+    {
+      "id": "serpAPI_0",
+      "position": { "x": 100, "y": 560 },
+      "type": "customNode",
+      "data": {
+        "id": "serpAPI_0",
+        "label": "Serp API",
+        "version": 1,
+        "name": "serpAPI",
+        "type": "SerpAPI",
+        "baseClasses": ["SerpAPI", "Tool", "StructuredTool", "Runnable"],
+        "category": "Tools",
+        "description": "Wrapper around SerpAPI - a real-time API to access Google search results",
+        "inputParams": [
+          { "label": "Connect Credential", "name": "credential", "type": "credential", "credentialNames": ["serpApi"] }
+        ],
+        "inputAnchors": [],
+        "inputs": {},
+        "outputAnchors": [
+          {
+            "id": "serpAPI_0-output-serpAPI-SerpAPI|Tool|StructuredTool|Runnable",
+            "name": "serpAPI",
+            "label": "Serp API",
+            "type": "SerpAPI | Tool | StructuredTool | Runnable"
+          }
+        ],
+        "outputs": {},
+        "selected": false
+      },
+      "width": 300,
+      "height": 275,
+      "selected": false,
+      "positionAbsolute": { "x": 100, "y": 560 },
+      "dragging": false
+    },
+    {
+      "id": "webBrowser_0",
+      "position": { "x": 100, "y": 880 },
+      "type": "customNode",
+      "data": {
+        "id": "webBrowser_0",
+        "label": "Web Browser",
+        "version": 1,
+        "name": "webBrowser",
+        "type": "WebBrowser",
+        "baseClasses": ["WebBrowser", "Tool", "StructuredTool", "Runnable"],
+        "category": "Tools",
+        "description": "Gives agent the ability to visit a website and extract information",
+        "inputParams": [],
+        "inputAnchors": [
+          {
+            "label": "Language Model",
+            "name": "model",
+            "type": "BaseLanguageModel"
+          },
+          {
+            "label": "Embeddings",
+            "name": "embeddings",
+            "type": "Embeddings"
+          }
+        ],
+        "inputs": {
+          "model": "chatOpenAI_0-output-chatOpenAI-ChatOpenAI|BaseChatModel|BaseLanguageModel|Runnable"
+        },
+        "outputAnchors": [
+          {
+            "id": "webBrowser_0-output-webBrowser-WebBrowser|Tool|StructuredTool|Runnable",
+            "name": "webBrowser",
+            "label": "Web Browser",
+            "type": "WebBrowser | Tool | StructuredTool | Runnable"
+          }
+        ],
+        "outputs": {},
+        "selected": false
+      },
+      "width": 300,
+      "height": 375,
+      "selected": false,
+      "positionAbsolute": { "x": 100, "y": 880 },
+      "dragging": false
+    },
+    {
+      "id": "openAIToolAgent_0",
+      "position": { "x": 500, "y": 300 },
+      "type": "customNode",
+      "data": {
+        "id": "openAIToolAgent_0",
+        "label": "OpenAI Tool Agent",
+        "version": 2,
+        "name": "openAIToolAgent",
+        "type": "AgentExecutor",
+        "baseClasses": ["AgentExecutor", "BaseChain", "Runnable"],
+        "category": "Agents",
+        "description": "Agent that uses OpenAI Function Calling to pick the right tool and args",
+        "inputParams": [
+          { "label": "System Message", "name": "systemMessage", "type": "string", "rows": 4, "default": "You are a helpful assistant." },
+          { "label": "Max Iterations", "name": "maxIterations", "type": "number", "default": 10 }
+        ],
+        "inputAnchors": [
+          { "label": "Tools", "name": "tools", "type": "Tool", "list": true },
+          { "label": "Language Model", "name": "model", "type": "BaseChatModel" },
+          { "label": "Memory", "name": "memory", "type": "BaseChatMemory" }
+        ],
+        "inputs": {
+          "tools": [
+            "serpAPI_0-output-serpAPI-SerpAPI|Tool|StructuredTool|Runnable",
+            "webBrowser_0-output-webBrowser-WebBrowser|Tool|StructuredTool|Runnable"
+          ],
+          "model": "chatOpenAI_0-output-chatOpenAI-ChatOpenAI|BaseChatModel|BaseLanguageModel|Runnable",
+          "memory": "bufferWindowMemory_0-output-bufferWindowMemory-BufferWindowMemory|BaseChatMemory|BaseMemory",
+          "systemMessage": "You are a smart AI Shopping Assistant.\n\n## Your Workflow\n\n1. SEARCH: When the user describes what they want to buy, use the SerpAPI search tool to find real products online. Search with keywords that include the product name, the user's budget (if mentioned), and the word \"buy\" or \"price\".\n\n2. PRESENT OPTIONS: Return a clean numbered list of 5–8 product options in this format:\n   Option [N]: [Product Name] — [Price] ([Seller/Platform]) — [URL]\n\n   Always include the direct product URL so you can retrieve it if the user selects that option.\n\n3. HANDLE SELECTION: When the user picks an option (by number or by name), retrieve the corresponding URL from your memory of the previous search results. Present it clearly as a buy link.\n\n4. GO TO BUY PAGE: Respond with:\n   \"Here is the buy link for [Product Name]: [URL]\"\n   Use the web browser tool to verify the URL is valid and live if needed.\n\n## Rules\n- Always search before presenting options. Never invent or guess product names, prices, or URLs.\n- Always remember the full option list from your last search so the user can refer back to it.\n- If the user mentions a budget, filter results to that price range.\n- Keep descriptions concise: product name, price, seller, and URL only.\n- If the user wants to refine their search (different budget, brand, etc.), run a new search.\n- Be friendly and helpful. If something appears out of stock, suggest the closest alternative.",
+          "maxIterations": 10
+        },
+        "outputAnchors": [
+          {
+            "id": "openAIToolAgent_0-output-openAIToolAgent-AgentExecutor|BaseChain|Runnable",
+            "name": "openAIToolAgent",
+            "label": "OpenAI Tool Agent",
+            "type": "AgentExecutor | BaseChain | Runnable"
+          }
+        ],
+        "outputs": {},
+        "selected": false
+      },
+      "width": 300,
+      "height": 860,
+      "selected": false,
+      "positionAbsolute": { "x": 500, "y": 300 },
+      "dragging": false
+    }
+  ],
+  "edges": [
+    {
+      "source": "chatOpenAI_0",
+      "sourceHandle": "chatOpenAI_0-output-chatOpenAI-ChatOpenAI|BaseChatModel|BaseLanguageModel|Runnable",
+      "target": "openAIToolAgent_0",
+      "targetHandle": "openAIToolAgent_0-input-model-BaseChatModel",
+      "type": "buttonedge",
+      "id": "chatOpenAI_0-chatOpenAI_0-output-chatOpenAI-ChatOpenAI|BaseChatModel|BaseLanguageModel|Runnable-openAIToolAgent_0-openAIToolAgent_0-input-model-BaseChatModel",
+      "data": { "label": "" }
+    },
+    {
+      "source": "bufferWindowMemory_0",
+      "sourceHandle": "bufferWindowMemory_0-output-bufferWindowMemory-BufferWindowMemory|BaseChatMemory|BaseMemory",
+      "target": "openAIToolAgent_0",
+      "targetHandle": "openAIToolAgent_0-input-memory-BaseChatMemory",
+      "type": "buttonedge",
+      "id": "bufferWindowMemory_0-bufferWindowMemory_0-output-bufferWindowMemory-BufferWindowMemory|BaseChatMemory|BaseMemory-openAIToolAgent_0-openAIToolAgent_0-input-memory-BaseChatMemory",
+      "data": { "label": "" }
+    },
+    {
+      "source": "serpAPI_0",
+      "sourceHandle": "serpAPI_0-output-serpAPI-SerpAPI|Tool|StructuredTool|Runnable",
+      "target": "openAIToolAgent_0",
+      "targetHandle": "openAIToolAgent_0-input-tools-Tool",
+      "type": "buttonedge",
+      "id": "serpAPI_0-serpAPI_0-output-serpAPI-SerpAPI|Tool|StructuredTool|Runnable-openAIToolAgent_0-openAIToolAgent_0-input-tools-Tool",
+      "data": { "label": "" }
+    },
+    {
+      "source": "webBrowser_0",
+      "sourceHandle": "webBrowser_0-output-webBrowser-WebBrowser|Tool|StructuredTool|Runnable",
+      "target": "openAIToolAgent_0",
+      "targetHandle": "openAIToolAgent_0-input-tools-Tool",
+      "type": "buttonedge",
+      "id": "webBrowser_0-webBrowser_0-output-webBrowser-WebBrowser|Tool|StructuredTool|Runnable-openAIToolAgent_0-openAIToolAgent_0-input-tools-Tool",
+      "data": { "label": "" }
+    },
+    {
+      "source": "chatOpenAI_0",
+      "sourceHandle": "chatOpenAI_0-output-chatOpenAI-ChatOpenAI|BaseChatModel|BaseLanguageModel|Runnable",
+      "target": "webBrowser_0",
+      "targetHandle": "webBrowser_0-input-model-BaseLanguageModel",
+      "type": "buttonedge",
+      "id": "chatOpenAI_0-chatOpenAI_0-output-chatOpenAI-ChatOpenAI|BaseChatModel|BaseLanguageModel|Runnable-webBrowser_0-webBrowser_0-input-model-BaseLanguageModel",
+      "data": { "label": "" }
+    }
+  ],
+  "viewport": {
+    "x": 0,
+    "y": 0,
+    "zoom": 0.75
+  }
+}

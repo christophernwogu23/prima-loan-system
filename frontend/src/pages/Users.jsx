@@ -12,23 +12,21 @@ export default function Users() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
-  const [selectedUserId, setSelectedUserId] = useState(null)  // NEW
+  const [selectedUserId, setSelectedUserId] = useState(null)
   const [filterRole, setFilterRole] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  
+
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    first_name: '',
-    middle_name: '',
-    last_name: '',
-    role: 'customer'
+    email: '', password: '', first_name: '', middle_name: '', last_name: '', role: 'customer'
   })
 
+  const isAdmin = currentUser?.role === 'admin'
+  const isManager = currentUser?.role === 'manager'
+  // Managers can create customers only; admins can create any role
+  const canCreate = isAdmin || isManager
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      loadUsers()
-    }, 300)
+    const timer = setTimeout(() => loadUsers(), 300)
     return () => clearTimeout(timer)
   }, [filterRole, searchQuery])
 
@@ -38,7 +36,6 @@ export default function Users() {
       const data = await getUsers(filterRole || null, null, searchQuery || null)
       setUsers(data)
     } catch (error) {
-      console.error('Failed to load users:', error)
       toast.error('Failed to load users')
     } finally {
       setLoading(false)
@@ -98,13 +95,10 @@ export default function Users() {
     <Layout>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold dark:text-white">Users</h2>
-        {currentUser?.role === 'admin' && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-          >
-            <Plus size={20} />
-            Add User
+        {canCreate && (
+          <button onClick={() => { setEditingUser(null); setFormData({ email: '', password: '', first_name: '', middle_name: '', last_name: '', role: 'customer' }); setShowModal(true) }}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+            <Plus size={20} /> {isManager ? 'Add Customer' : 'Add User'}
           </button>
         )}
       </div>
@@ -112,28 +106,17 @@ export default function Users() {
       <div className="flex gap-4 mb-6 flex-wrap">
         <div className="flex-1 min-w-[300px] relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder="Search by name or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-10 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-          />
+          <input type="text" placeholder="Search by name or email..." value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" />
           {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
               <X size={18} />
             </button>
           )}
         </div>
-
-        <select
-          value={filterRole}
-          onChange={(e) => setFilterRole(e.target.value)}
-          className="px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-        >
+        <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
+          className="px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white">
           <option value="">All Roles</option>
           <option value="admin">Admin</option>
           <option value="ceo">CEO</option>
@@ -163,62 +146,35 @@ export default function Users() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {users.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+              {users.map(u => (
+                <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                    {user.first_name} {user.middle_name || ''} {user.last_name}
+                    {u.first_name} {u.middle_name || ''} {u.last_name}
                   </td>
-                  <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{user.email}</td>
+                  <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{u.email}</td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}>
-                      {user.role.replace('_', ' ')}
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(u.role)}`}>
+                      {u.role.replace('_', ' ')}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
-                      {user.status}
+                      {u.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
-                    {new Date(user.created_at).toLocaleDateString()}
-                  </td>
+                  <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{new Date(u.created_at).toLocaleDateString()}</td>
                   <td className="px-6 py-4">
                     <div className="flex gap-3">
-                      {/* VIEW BUTTON - ADDED BACK */}
-                      <button
-                        onClick={() => setSelectedUserId(user.id)}
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                        title="View Details"
-                      >
+                      <button onClick={() => setSelectedUserId(u.id)}
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800" title="View Details">
                         <Eye size={18} />
                       </button>
-                      
-                      {currentUser?.role === 'admin' && (
+                      {isAdmin && (
                         <>
-                          <button
-                            onClick={() => {
-                              setEditingUser(user)
-                              setFormData({
-                                email: user.email,
-                                password: '',
-                                first_name: user.first_name,
-                                middle_name: user.middle_name || '',
-                                last_name: user.last_name,
-                                role: user.role
-                              })
-                              setShowModal(true)
-                            }}
-                            className="text-yellow-600 hover:text-yellow-800"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          {user.id !== currentUser.id && (
-                            <button
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="text-red-600 hover:text-red-800"
-                            >
-                              <Trash2 size={18} />
-                            </button>
+                          <button onClick={() => { setEditingUser(u); setFormData({ email: u.email, password: '', first_name: u.first_name, middle_name: u.middle_name || '', last_name: u.last_name, role: u.role }); setShowModal(true) }}
+                            className="text-yellow-600 hover:text-yellow-800"><Edit2 size={18} /></button>
+                          {u.id !== currentUser.id && (
+                            <button onClick={() => handleDeleteUser(u.id)} className="text-red-600 hover:text-red-800"><Trash2 size={18} /></button>
                           )}
                         </>
                       )}
@@ -236,98 +192,60 @@ export default function Users() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold dark:text-white">
-                {editingUser ? 'Edit User' : 'Create User'}
-              </h3>
-              <button 
-                onClick={() => {
-                  setShowModal(false)
-                  setEditingUser(null)
-                  setFormData({ email: '', password: '', first_name: '', middle_name: '', last_name: '', role: 'customer' })
-                }} 
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X size={20} />
-              </button>
+              <h3 className="text-lg font-semibold dark:text-white">{editingUser ? 'Edit User' : isManager ? 'Create Customer' : 'Create User'}</h3>
+              <button onClick={() => { setShowModal(false); setEditingUser(null); setFormData({ email: '', password: '', first_name: '', middle_name: '', last_name: '', role: 'customer' }) }}
+                className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
             </div>
-            
             <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1 dark:text-gray-300">First Name</label>
-                  <input
-                    type="text"
-                    value={formData.first_name}
-                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                    required
-                  />
+                  <input type="text" value={formData.first_name} onChange={e => setFormData({ ...formData, first_name: e.target.value })}
+                    className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1 dark:text-gray-300">Last Name</label>
-                  <input
-                    type="text"
-                    value={formData.last_name}
-                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                    required
-                  />
+                  <input type="text" value={formData.last_name} onChange={e => setFormData({ ...formData, last_name: e.target.value })}
+                    className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" required />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">Middle Name (optional)</label>
-                <input
-                  type="text"
-                  value={formData.middle_name}
-                  onChange={(e) => setFormData({ ...formData, middle_name: e.target.value })}
-                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                />
+                <input type="text" value={formData.middle_name} onChange={e => setFormData({ ...formData, middle_name: e.target.value })}
+                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" />
               </div>
-              
               <div>
                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                  required
-                />
+                <input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" required />
               </div>
-              
               <div>
                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">
                   Password {editingUser && '(leave blank to keep current)'}
                 </label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                  required={!editingUser}
-                />
+                <input type="password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" required={!editingUser} />
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1 dark:text-gray-300">Role</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="customer">Customer</option>
-                  <option value="loan_officer">Loan Officer</option>
-                  <option value="manager">Manager</option>
-                  <option value="ceo">CEO</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              
-              <button
-                type="submit"
-                className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-              >
+              {/* Role selector — managers are locked to customer only */}
+              {isAdmin && (
+                <div>
+                  <label className="block text-sm font-medium mb-1 dark:text-gray-300">Role</label>
+                  <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })}
+                    className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white">
+                    <option value="customer">Customer</option>
+                    <option value="loan_officer">Loan Officer</option>
+                    <option value="manager">Manager</option>
+                    <option value="ceo">CEO</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+              )}
+              {isManager && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-2">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">Managers can only create customer accounts.</p>
+                </div>
+              )}
+              <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
                 {editingUser ? 'Update User' : 'Create User'}
               </button>
             </form>
@@ -335,13 +253,7 @@ export default function Users() {
         </div>
       )}
 
-      {/* User Details Modal */}
-      {selectedUserId && (
-        <UserDetailsModal
-          userId={selectedUserId}
-          onClose={() => setSelectedUserId(null)}
-        />
-      )}
+      {selectedUserId && <UserDetailsModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />}
     </Layout>
   )
 }
