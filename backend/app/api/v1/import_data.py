@@ -87,12 +87,15 @@ async def clear_imported_customers(
         User.role == "customer"
     ).all()
     count = len(customers)
-    for customer in customers:
-        # Delete savings first
-        db.query(Savings).filter(Savings.user_id == customer.id).delete()
-        db.delete(customer)
+    customer_ids = [c.id for c in customers]
+    # Delete loans first (FK constraint)
+    db.query(LoanApplication).filter(LoanApplication.customer_id.in_(customer_ids)).delete(synchronize_session=False)
+    # Delete savings
+    db.query(Savings).filter(Savings.user_id.in_(customer_ids)).delete(synchronize_session=False)
+    # Now delete customers
+    db.query(User).filter(User.id.in_(customer_ids)).delete(synchronize_session=False)
     db.commit()
-    return {"message": f"Deleted {count} imported customer(s) and their savings"}
+    return {"message": f"Deleted {count} imported customer(s), their loans and savings"}
 
 
 @router.delete("/clear/fixed-deposits")
@@ -161,9 +164,13 @@ async def clear_all_imported_data(
         User.role == "customer"
     ).all()
     customers_count = len(customers)
-    for c in customers:
-        db.query(Savings).filter(Savings.user_id == c.id).delete()
-        db.delete(c)
+    customer_ids = [c.id for c in customers]
+    # Delete ALL loans for these customers first (FK constraint)
+    all_loans_count = db.query(LoanApplication).filter(LoanApplication.customer_id.in_(customer_ids)).delete(synchronize_session=False)
+    # Delete savings
+    db.query(Savings).filter(Savings.user_id.in_(customer_ids)).delete(synchronize_session=False)
+    # Delete customers
+    db.query(User).filter(User.id.in_(customer_ids)).delete(synchronize_session=False)
 
     fd_count = db.query(FixedDeposit).delete()
     exp_count = db.query(Expense).filter(Expense.description == "Imported from Excel").delete()
