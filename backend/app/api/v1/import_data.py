@@ -41,16 +41,24 @@ def clean_amount(value):
 
 def parse_date(value, fallback=None):
     """Parse date from Excel cell, return fallback if invalid"""
-    if value is None or (isinstance(value, float) and pd.isna(value)):
-        return fallback or datetime.now()
-    if isinstance(value, datetime):
-        return value
-    if hasattr(value, 'to_pydatetime'):
-        return value.to_pydatetime()
+    fallback = fallback or datetime.now()
+    if value is None:
+        return fallback
     try:
-        return pd.to_datetime(value).to_pydatetime()
+        if isinstance(value, datetime):
+            return value
+        if hasattr(value, 'to_pydatetime'):
+            dt = value.to_pydatetime()
+            # Check for NaT
+            if pd.isnull(dt):
+                return fallback
+            return dt
+        parsed = pd.to_datetime(value)
+        if pd.isnull(parsed):
+            return fallback
+        return parsed.to_pydatetime()
     except:
-        return fallback or datetime.now()
+        return fallback
 
 
 # ===== CLEAR ENDPOINTS =====
@@ -455,10 +463,12 @@ async def import_fixed_deposits(
         for idx, row in df.iterrows():
             try:
                 name = str(row.get('NAME', '')).strip()
-                if not name or name.lower() in ('nan', 'total'):
+                if not name or name.lower() in ('nan', 'total', 'nat', '') or pd.isna(row.get('NAME', '')):
                     continue
 
                 amount = clean_amount(row.get('AMOUNT', 0))
+                if amount == 0:
+                    continue
                 interest = clean_amount(row.get('INTEREST', 0))
                 duration = str(row.get('DURATION', '6 MONTHS')).strip()
                 value_date = parse_date(row.get('VALUE DATE'))
