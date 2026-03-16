@@ -321,6 +321,10 @@ async def delete_user(
                 detail=f"Cannot delete user with {active_loans} active loan(s). Close or reject loans first."
             )
 
+    # Delete savings before deleting user (FK constraint)
+    from app.models.savings import Savings
+    db.query(Savings).filter(Savings.user_id == user_id).delete(synchronize_session=False)
+
     db.delete(user)
     db.commit()
     return {"message": "User deleted successfully", "deleted_user_id": user_id}

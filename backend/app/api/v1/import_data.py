@@ -13,6 +13,7 @@ from app.models.fixed_deposit import FixedDeposit
 from app.models.expense import Expense
 from app.core.security import get_password_hash
 from app.models.shareholder import Shareholder
+from app.models.payment import Payment
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -67,8 +68,10 @@ async def clear_imported_loans(
         LoanApplication.application_number.like("IMP-%")
     ).all()
     count = len(loans)
-    for loan in loans:
-        db.delete(loan)
+    loan_ids = [l.id for l in loans]
+    # Delete payments first
+    db.query(Payment).filter(Payment.loan_application_id.in_(loan_ids)).delete(synchronize_session=False)
+    db.query(LoanApplication).filter(LoanApplication.id.in_(loan_ids)).delete(synchronize_session=False)
     db.commit()
     return {"message": f"Deleted {count} imported loan(s)"}
 
@@ -165,11 +168,11 @@ async def clear_all_imported_data(
     ).all()
     customers_count = len(customers)
     customer_ids = [c.id for c in customers]
-    # Delete ALL loans for these customers first (FK constraint)
+    # Delete payments → loans → savings → customers in correct order
+    loan_ids = [l.id for l in db.query(LoanApplication).filter(LoanApplication.customer_id.in_(customer_ids)).all()]
+    db.query(Payment).filter(Payment.loan_application_id.in_(loan_ids)).delete(synchronize_session=False)
     all_loans_count = db.query(LoanApplication).filter(LoanApplication.customer_id.in_(customer_ids)).delete(synchronize_session=False)
-    # Delete savings
     db.query(Savings).filter(Savings.user_id.in_(customer_ids)).delete(synchronize_session=False)
-    # Delete customers
     db.query(User).filter(User.id.in_(customer_ids)).delete(synchronize_session=False)
 
     fd_count = db.query(FixedDeposit).delete()
