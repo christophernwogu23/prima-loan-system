@@ -92,7 +92,7 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 cors_kwargs = {
     "allow_origins": settings.cors_origins,
     "allow_credentials": True,
-    "allow_methods": ["*"],
+    "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     "allow_headers": ["*"],
 }
 
