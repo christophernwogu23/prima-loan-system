@@ -154,7 +154,8 @@ export default function ReviewApplications() {
       approved_amount: app.approved_amount || '',
       tenure_months: app.tenure_months,
       status: app.status,
-      purpose: app.purpose || ''
+      purpose: app.purpose || '',
+      created_at: app.created_at ? new Date(app.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
     })
   }
 
@@ -168,7 +169,9 @@ export default function ReviewApplications() {
         approved_amount: editModal.approved_amount ? parseFloat(editModal.approved_amount) : null,
         tenure_months: parseInt(editModal.tenure_months),
         status: editModal.status,
-        purpose: editModal.purpose
+        purpose: editModal.purpose,
+        created_at: editModal.created_at ? new Date(editModal.created_at).toISOString() : null,
+        approved_at: editModal.created_at ? new Date(editModal.created_at).toISOString() : null,
       })
       toast.success('Application updated successfully!')
       setEditModal(null)
@@ -584,6 +587,18 @@ export default function ReviewApplications() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Purpose</label>
                 <textarea value={editModal.purpose} onChange={e => setEditModal({ ...editModal, purpose: e.target.value })}
                   className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white" rows="3" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                  <Calendar size={14} /> Loan Date (Backdate)
+                </label>
+                <input
+                  type="date"
+                  value={editModal.created_at}
+                  onChange={e => setEditModal({ ...editModal, created_at: e.target.value })}
+                  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Change this to set the original disbursement date</p>
               </div>
               <div className="flex gap-3 pt-4">
                 <button type="button" onClick={() => setEditModal(null)} disabled={updating}
