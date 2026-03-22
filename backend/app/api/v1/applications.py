@@ -356,8 +356,8 @@ async def update_application(
     current_user: User = Depends(get_current_user)
 ):
     """Update application"""
-    if current_user.role not in ["admin", "ceo"]:
-        raise HTTPException(status_code=403, detail="Only admin and CEO can edit")
+    if current_user.role not in ["admin", "ceo", "manager"]:
+        raise HTTPException(status_code=403, detail="Only admin, CEO and manager can edit")
 
     application = db.query(LoanApplication).filter(LoanApplication.id == application_id).first()
     if not application:

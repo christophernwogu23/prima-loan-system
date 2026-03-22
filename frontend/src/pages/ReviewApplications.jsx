@@ -34,7 +34,7 @@ export default function ReviewApplications() {
   const [customerSearch, setCustomerSearch] = useState('')
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
 
-  const canModify = ['admin', 'ceo'].includes(user?.role)
+  const canModify = ['admin', 'ceo', 'manager'].includes(user?.role)
   const canApplyForCustomer = ['loan_officer', 'manager', 'admin'].includes(user?.role)
   const isCEO = user?.role === 'ceo'
 
@@ -557,8 +557,8 @@ export default function ReviewApplications() {
       {/* Edit Modal */}
       {editModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg">
-            <div className="border-b dark:border-gray-700 px-6 py-4 flex justify-between items-center">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="border-b dark:border-gray-700 px-6 py-4 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10">
               <h3 className="text-lg font-semibold dark:text-white">Edit Application</h3>
               <button onClick={() => setEditModal(null)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700"><X className="w-5 h-5" /></button>
             </div>
