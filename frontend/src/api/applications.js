@@ -5,12 +5,7 @@ export const getApplications = async (month = null, officerId = null, search = n
   if (month) params.push(`month=${month}`)
   if (officerId) params.push(`officer_id=${officerId}`)
   if (search) params.push(`search=${encodeURIComponent(search)}`)
-  
-  let url = '/applications/'
-  if (params.length > 0) {
-    url += `?${params.join('&')}`
-  }
-  
+  const url = `/applications/${params.length ? '?' + params.join('&') : ''}`
   const { data } = await client.get(url)
   return data
 }
@@ -31,6 +26,7 @@ export const updateApplication = async (applicationId, updateData) => {
 }
 
 export const reviewApplication = async (id, reviewData) => {
+  // reviewData: { action, comments, disbursement_date? }
   const { data } = await client.post(`/applications/${id}/review`, reviewData)
   return data
 }

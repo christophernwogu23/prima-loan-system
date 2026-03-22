@@ -36,16 +36,18 @@ class ApplicationResponse(BaseModel):
     manager_comments: Optional[str] = None
     ceo_comments: Optional[str] = None
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 class ReviewRequest(BaseModel):
     action: str
     comments: Optional[str] = None
+    disbursement_date: Optional[str] = None  # ISO format: "2025-01-15" for backdating
 
 def generate_application_number():
     return f"APP-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
+
 
 @router.post("/", response_model=ApplicationResponse)
 async def create_application(
@@ -57,15 +59,15 @@ async def create_application(
     if app_data.customer_id:
         if current_user.role not in ["loan_officer", "manager", "admin"]:
             raise HTTPException(status_code=403, detail="Only staff can apply on behalf of customers")
-        
+
         customer = db.query(User).filter(User.id == app_data.customer_id).first()
         if not customer or customer.role != "customer":
             raise HTTPException(status_code=404, detail="Customer not found")
-        
+
         if current_user.role == "loan_officer":
             if customer.assigned_officer_id != current_user.id:
                 raise HTTPException(status_code=403, detail="Customer not assigned to you")
-        
+
         customer_id = app_data.customer_id
         assigned_officer_id = current_user.id if current_user.role == "loan_officer" else customer.assigned_officer_id
     else:
@@ -73,17 +75,17 @@ async def create_application(
             raise HTTPException(status_code=400, detail="Please specify customer_id")
         customer_id = current_user.id
         assigned_officer_id = current_user.assigned_officer_id
-    
+
     product = db.query(LoanProduct).filter(LoanProduct.id == app_data.loan_product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Loan product not found")
-    
+
     if app_data.requested_amount < product.min_amount or app_data.requested_amount > product.max_amount:
         raise HTTPException(status_code=400, detail=f"Amount must be between {product.min_amount} and {product.max_amount}")
-    
+
     if app_data.tenure_months < product.min_tenure_months or app_data.tenure_months > product.max_tenure_months:
         raise HTTPException(status_code=400, detail=f"Tenure must be between {product.min_tenure_months} and {product.max_tenure_months} months")
-    
+
     application = LoanApplication(
         application_number=generate_application_number(),
         customer_id=customer_id,
@@ -95,129 +97,13 @@ async def create_application(
         interest_rate=product.interest_rate,
         status="submitted"
     )
-    
+
     db.add(application)
     db.commit()
     db.refresh(application)
-    
+
     customer = db.query(User).filter(User.id == customer_id).first()
-    customer_name = f"{customer.first_name} {customer.last_name}" if customer else None
-    product_name = product.name if product else None
-    
-    return ApplicationResponse(
-        id=application.id,
-        application_number=application.application_number,
-        customer_id=application.customer_id,
-        customer_name=customer_name,
-        loan_product_id=application.loan_product_id,
-        product_name=product_name,
-        requested_amount=application.requested_amount,
-        approved_amount=application.approved_amount,
-        tenure_months=application.tenure_months,
-        purpose=application.purpose,
-        status=application.status,
-        interest_rate=application.interest_rate,
-        officer_comments=application.officer_comments,
-        manager_comments=application.manager_comments,
-        ceo_comments=application.ceo_comments,
-        created_at=application.created_at
-    )
 
-@router.get("/")
-async def get_applications(
-    month: Optional[str] = Query(None, regex="^\\d{4}-\\d{2}$"),
-    officer_id: Optional[int] = Query(None),
-    search: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Get all applications with customer and product names"""
-    
-    query = db.query(
-        LoanApplication,
-        User.first_name,
-        User.last_name,
-        LoanProduct.name.label("product_name")
-    ).join(
-        User, LoanApplication.customer_id == User.id
-    ).join(
-        LoanProduct, LoanApplication.loan_product_id == LoanProduct.id
-    )
-    
-    if current_user.role == "customer":
-        query = query.filter(LoanApplication.customer_id == current_user.id)
-    elif current_user.role == "loan_officer":
-        query = query.filter(LoanApplication.assigned_officer_id == current_user.id)
-    elif current_user.role in ["manager", "ceo", "admin"]:
-        if officer_id:
-            query = query.filter(LoanApplication.assigned_officer_id == officer_id)
-    
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(
-            (User.first_name.ilike(search_term)) |
-            (User.last_name.ilike(search_term)) |
-            (LoanApplication.application_number.ilike(search_term))
-        )
-    
-    if month:
-        year, month_num = map(int, month.split("-"))
-        start_date = datetime(year, month_num, 1)
-        if month_num == 12:
-            end_date = datetime(year + 1, 1, 1)
-        else:
-            end_date = datetime(year, month_num + 1, 1)
-        
-        query = query.filter(
-            LoanApplication.created_at >= start_date,
-            LoanApplication.created_at < end_date
-        )
-    
-    results = query.order_by(LoanApplication.created_at.desc()).all()
-    
-    applications = []
-    for app, first_name, last_name, product_name in results:
-        applications.append({
-            "id": app.id,
-            "application_number": app.application_number,
-            "customer_id": app.customer_id,
-            "customer_name": f"{first_name} {last_name}",
-            "loan_product_id": app.loan_product_id,
-            "product_name": product_name,
-            "requested_amount": app.requested_amount,
-            "approved_amount": app.approved_amount,
-            "tenure_months": app.tenure_months,
-            "purpose": app.purpose,
-            "status": app.status,
-            "interest_rate": app.interest_rate,
-            "officer_comments": app.officer_comments,
-            "manager_comments": app.manager_comments,
-            "ceo_comments": app.ceo_comments,
-            "created_at": app.created_at
-        })
-    
-    return applications
-
-@router.get("/{app_id}", response_model=ApplicationResponse)
-async def get_application(
-    app_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Get a single application"""
-    application = db.query(LoanApplication).filter(LoanApplication.id == app_id).first()
-    if not application:
-        raise HTTPException(status_code=404, detail="Application not found")
-    
-    if current_user.role == "customer" and application.customer_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    if current_user.role == "loan_officer" and application.assigned_officer_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    customer = db.query(User).filter(User.id == application.customer_id).first()
-    product = db.query(LoanProduct).filter(LoanProduct.id == application.loan_product_id).first()
-    
     return ApplicationResponse(
         id=application.id,
         application_number=application.application_number,
@@ -237,6 +123,114 @@ async def get_application(
         created_at=application.created_at
     )
 
+
+@router.get("/")
+async def get_applications(
+    month: Optional[str] = Query(None, regex="^\\d{4}-\\d{2}$"),
+    officer_id: Optional[int] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all applications with customer and product names"""
+    query = db.query(
+        LoanApplication,
+        User.first_name,
+        User.last_name,
+        LoanProduct.name.label("product_name")
+    ).join(
+        User, LoanApplication.customer_id == User.id
+    ).join(
+        LoanProduct, LoanApplication.loan_product_id == LoanProduct.id
+    )
+
+    if current_user.role == "customer":
+        query = query.filter(LoanApplication.customer_id == current_user.id)
+    elif current_user.role == "loan_officer":
+        query = query.filter(LoanApplication.assigned_officer_id == current_user.id)
+    elif current_user.role in ["manager", "ceo", "admin"]:
+        if officer_id:
+            query = query.filter(LoanApplication.assigned_officer_id == officer_id)
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            (User.first_name.ilike(search_term)) |
+            (User.last_name.ilike(search_term)) |
+            (LoanApplication.application_number.ilike(search_term))
+        )
+
+    if month:
+        year, month_num = map(int, month.split("-"))
+        start_date = datetime(year, month_num, 1)
+        end_date = datetime(year + 1, 1, 1) if month_num == 12 else datetime(year, month_num + 1, 1)
+        query = query.filter(
+            LoanApplication.created_at >= start_date,
+            LoanApplication.created_at < end_date
+        )
+
+    results = query.order_by(LoanApplication.created_at.desc()).all()
+
+    return [{
+        "id": app.id,
+        "application_number": app.application_number,
+        "customer_id": app.customer_id,
+        "customer_name": f"{first_name} {last_name}",
+        "loan_product_id": app.loan_product_id,
+        "product_name": product_name,
+        "requested_amount": app.requested_amount,
+        "approved_amount": app.approved_amount,
+        "tenure_months": app.tenure_months,
+        "purpose": app.purpose,
+        "status": app.status,
+        "interest_rate": app.interest_rate,
+        "officer_comments": app.officer_comments,
+        "manager_comments": app.manager_comments,
+        "ceo_comments": app.ceo_comments,
+        "created_at": app.created_at
+    } for app, first_name, last_name, product_name in results]
+
+
+@router.get("/{app_id}", response_model=ApplicationResponse)
+async def get_application(
+    app_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get a single application"""
+    application = db.query(LoanApplication).filter(LoanApplication.id == app_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    if current_user.role == "customer" and application.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if current_user.role == "loan_officer" and application.assigned_officer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    customer = db.query(User).filter(User.id == application.customer_id).first()
+    product = db.query(LoanProduct).filter(LoanProduct.id == application.loan_product_id).first()
+
+    return ApplicationResponse(
+        id=application.id,
+        application_number=application.application_number,
+        customer_id=application.customer_id,
+        customer_name=f"{customer.first_name} {customer.last_name}" if customer else None,
+        loan_product_id=application.loan_product_id,
+        product_name=product.name if product else None,
+        requested_amount=application.requested_amount,
+        approved_amount=application.approved_amount,
+        tenure_months=application.tenure_months,
+        purpose=application.purpose,
+        status=application.status,
+        interest_rate=application.interest_rate,
+        officer_comments=application.officer_comments,
+        manager_comments=application.manager_comments,
+        ceo_comments=application.ceo_comments,
+        created_at=application.created_at
+    )
+
+
 @router.get("/user/{user_id}")
 async def get_user_applications(
     user_id: int,
@@ -246,17 +240,16 @@ async def get_user_applications(
     """Get applications for a user"""
     if current_user.role == "customer" and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     if current_user.role == "loan_officer":
         customer = db.query(User).filter(User.id == user_id).first()
         if not customer or customer.assigned_officer_id != current_user.id:
             raise HTTPException(status_code=403, detail="Access denied")
-    
-    applications = db.query(LoanApplication).filter(
+
+    return db.query(LoanApplication).filter(
         LoanApplication.customer_id == user_id
     ).order_by(LoanApplication.created_at.desc()).all()
-    
-    return applications
+
 
 @router.post("/{app_id}/review")
 async def review_application(
@@ -269,56 +262,61 @@ async def review_application(
     application = db.query(LoanApplication).filter(LoanApplication.id == app_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
-    
+
     if current_user.role == "loan_officer" and application.assigned_officer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
-    
-    current_status = application.status
+
     action = review.action.lower()
     role = current_user.role
-    
+
     if role == "loan_officer":
-        if current_status not in ["submitted", "SUBMITTED"]:
+        if application.status not in ["submitted", "SUBMITTED"]:
             raise HTTPException(status_code=400, detail="Loan officer can only review submitted applications")
-        
         if action == "approve":
             application.status = "officer_approved"
         elif action == "reject":
             application.status = "officer_rejected"
         else:
             raise HTTPException(status_code=400, detail="Invalid action")
-        
         application.assigned_officer_id = current_user.id
         application.officer_reviewed_at = datetime.utcnow()
         application.officer_comments = review.comments
-    
+
     elif role == "manager":
-        if current_status not in ["officer_approved", "officer_rejected"]:
+        if application.status not in ["officer_approved", "officer_rejected"]:
             raise HTTPException(status_code=400, detail="Manager can only review officer-reviewed applications")
-        
         if action == "approve":
             application.status = "manager_approved"
         elif action == "reject":
             application.status = "rejected"
         else:
             raise HTTPException(status_code=400, detail="Invalid action")
-        
         application.manager_reviewed_at = datetime.utcnow()
         application.manager_comments = review.comments
-    
+
     elif role == "ceo":
-        if current_status != "manager_approved":
+        if application.status != "manager_approved":
             raise HTTPException(status_code=400, detail="CEO can only review manager-approved applications")
-        
+
         if action == "approve":
             application.status = "disbursed"
             application.approved_amount = application.requested_amount
-            application.approved_at = datetime.utcnow()
-            
-            # AUTO-INTEGRATION: Create GL entry when loan is disbursed
+
+            # Parse disbursement date — use provided date or default to now
+            if review.disbursement_date:
+                try:
+                    disburse_dt = datetime.strptime(review.disbursement_date, "%Y-%m-%d")
+                except ValueError:
+                    disburse_dt = datetime.utcnow()
+            else:
+                disburse_dt = datetime.utcnow()
+
+            application.approved_at = disburse_dt
+            application.created_at = disburse_dt  # backdate the loan record itself
+
+            # Auto GL entry on disbursement
             try:
                 from app.api.v1.general_ledger import auto_create_journal_entry
-                
                 auto_create_journal_entry(
                     db=db,
                     debit_account_code="1003",  # Loans Receivable
@@ -331,28 +329,24 @@ async def review_application(
                 print(f"✓ Auto-created GL entry for loan {application.application_number}")
             except Exception as e:
                 print(f"⚠️ Failed to create GL entry: {e}")
-                # Don't fail the loan approval if GL entry fails
-            
+
         elif action == "reject":
             application.status = "rejected"
         else:
             raise HTTPException(status_code=400, detail="Invalid action")
-        
+
         application.ceo_reviewed_at = datetime.utcnow()
         application.ceo_comments = review.comments
-    
+
     elif role == "admin":
         raise HTTPException(status_code=403, detail="Admin observes but does not participate in approvals")
     else:
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     db.commit()
     db.refresh(application)
-    
-    return {
-        "message": f"Application {action}d successfully",
-        "new_status": application.status
-    }
+    return {"message": f"Application {action}d successfully", "new_status": application.status}
+
 
 @router.put("/{application_id}")
 async def update_application(
@@ -364,18 +358,19 @@ async def update_application(
     """Update application"""
     if current_user.role not in ["admin", "ceo"]:
         raise HTTPException(status_code=403, detail="Only admin and CEO can edit")
-    
+
     application = db.query(LoanApplication).filter(LoanApplication.id == application_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
-    
+
     for key, value in update_data.items():
         if hasattr(application, key):
             setattr(application, key, value)
-    
+
     db.commit()
     db.refresh(application)
     return application
+
 
 @router.delete("/{application_id}")
 async def delete_application(
@@ -386,21 +381,19 @@ async def delete_application(
     """Delete application"""
     if current_user.role not in ["admin", "ceo"]:
         raise HTTPException(status_code=403, detail="Only admin and CEO can delete")
-    
+
     application = db.query(LoanApplication).filter(LoanApplication.id == application_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
-    
+
     payments = db.query(Payment).filter(Payment.loan_application_id == application_id).count()
     if payments > 0:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Cannot delete application with {payments} payment(s)."
-        )
-    
+        raise HTTPException(status_code=400, detail=f"Cannot delete application with {payments} payment(s).")
+
     db.delete(application)
     db.commit()
     return {"message": "Application deleted successfully", "id": application_id}
+
 
 @router.get("/{app_id}/offer-letter")
 async def get_offer_letter(
@@ -425,20 +418,14 @@ async def get_offer_letter(
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
-    # Use approved amount if disbursed, otherwise requested amount
     principal = application.approved_amount or application.requested_amount
     interest_rate = application.interest_rate or product.interest_rate
     tenure_months = application.tenure_months
-
-    # Calculations
     interest_amount = principal * (interest_rate / 100)
     total_amount = principal + interest_amount
     monthly_repayment = total_amount / tenure_months
 
-    # Dates
-    from datetime import timedelta
     from dateutil.relativedelta import relativedelta
-
     letter_date = application.approved_at or application.created_at
     first_repayment_date = letter_date + relativedelta(months=1)
     due_date = letter_date + relativedelta(months=tenure_months)

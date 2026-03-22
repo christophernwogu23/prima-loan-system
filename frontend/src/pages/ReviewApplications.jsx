@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore'
 import { useNavigate } from 'react-router-dom'
 import { getApplications, deleteApplication, updateApplication, reviewApplication } from '../api/applications'
 import toast from 'react-hot-toast'
-import { Eye, Edit2, Trash2, X, DollarSign, Users, CheckCircle, XCircle, Search, RefreshCw, Plus, FileText } from 'lucide-react'
+import { Eye, Edit2, Trash2, X, DollarSign, Users, CheckCircle, XCircle, Search, RefreshCw, Plus, FileText, Calendar } from 'lucide-react'
 
 export default function ReviewApplications() {
   const { user } = useAuthStore()
@@ -21,6 +21,7 @@ export default function ReviewApplications() {
   const [updating, setUpdating] = useState(false)
   const [reviewComments, setReviewComments] = useState('')
   const [reviewAction, setReviewAction] = useState(null)
+  const [disbursementDate, setDisbursementDate] = useState(new Date().toISOString().split('T')[0])
 
   // Apply modal
   const [applyModal, setApplyModal] = useState(false)
@@ -35,6 +36,7 @@ export default function ReviewApplications() {
 
   const canModify = ['admin', 'ceo'].includes(user?.role)
   const canApplyForCustomer = ['loan_officer', 'manager', 'admin'].includes(user?.role)
+  const isCEO = user?.role === 'ceo'
 
   const canReview = (app) => {
     if (user?.role === 'loan_officer' && app.status === 'submitted') return true
@@ -125,11 +127,17 @@ export default function ReviewApplications() {
     setReviewAction(action)
     setUpdating(true)
     try {
-      await reviewApplication(viewModal.id, { action, comments: reviewComments || null })
+      const payload = { action, comments: reviewComments || null }
+      // Only send disbursement_date when CEO is approving (disbursing)
+      if (isCEO && action === 'approve') {
+        payload.disbursement_date = disbursementDate
+      }
+      await reviewApplication(viewModal.id, payload)
       toast.success(`Application ${action === 'approve' ? 'approved' : 'rejected'} successfully!`)
       setViewModal(null)
       setReviewComments('')
       setReviewAction(null)
+      setDisbursementDate(new Date().toISOString().split('T')[0])
       loadApplications()
     } catch (error) {
       toast.error(error.response?.data?.detail || `Failed to ${action} application`)
@@ -211,7 +219,6 @@ export default function ReviewApplications() {
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(amount)
 
-  // Customer search helpers
   const selectedCustomer = customers.find(c => c.id === parseInt(applyForm.customer_id))
   const filteredCustomers = customers.filter(c =>
     `${c.first_name} ${c.last_name}`.toLowerCase().includes(customerSearch.toLowerCase())
@@ -342,7 +349,7 @@ export default function ReviewApplications() {
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{new Date(app.created_at).toLocaleDateString()}</td>
                     <td className="px-6 py-4">
                       <div className="flex justify-end gap-2">
-                        <button onClick={() => { setViewModal(app); setReviewComments('') }}
+                        <button onClick={() => { setViewModal(app); setReviewComments(''); setDisbursementDate(new Date().toISOString().split('T')[0]) }}
                           className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded" title="View">
                           <Eye size={18} />
                         </button>
@@ -383,58 +390,35 @@ export default function ReviewApplications() {
               <button onClick={() => setApplyModal(false)} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
             </div>
             <form onSubmit={handleApplyForCustomer} className="space-y-4">
-
-              {/* Customer searchable input */}
               <div>
                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">Customer *</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                  <input
-                    type="text"
-                    placeholder="Search customer by name..."
+                  <input type="text" placeholder="Search customer by name..."
                     value={customerInputValue}
-                    onChange={e => {
-                      setCustomerSearch(e.target.value)
-                      setApplyForm({ ...applyForm, customer_id: '' })
-                      setShowCustomerDropdown(true)
-                    }}
+                    onChange={e => { setCustomerSearch(e.target.value); setApplyForm({ ...applyForm, customer_id: '' }); setShowCustomerDropdown(true) }}
                     onFocus={() => setShowCustomerDropdown(true)}
-                    className="w-full pl-9 pr-8 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                  />
+                    className="w-full pl-9 pr-8 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" />
                   {applyForm.customer_id && (
-                    <button type="button"
-                      onClick={() => { setApplyForm({ ...applyForm, customer_id: '' }); setCustomerSearch('') }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                      <X size={16} />
-                    </button>
+                    <button type="button" onClick={() => { setApplyForm({ ...applyForm, customer_id: '' }); setCustomerSearch('') }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={16} /></button>
                   )}
-                  {/* Dropdown */}
                   {showCustomerDropdown && !applyForm.customer_id && (
                     <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                      {filteredCustomers.length === 0 ? (
-                        <p className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No customers found</p>
-                      ) : filteredCustomers.map(c => (
-                        <button key={c.id} type="button"
-                          onClick={() => {
-                            setApplyForm({ ...applyForm, customer_id: String(c.id) })
-                            setCustomerSearch('')
-                            setShowCustomerDropdown(false)
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
-                          {c.first_name} {c.last_name}
-                        </button>
-                      ))}
+                      {filteredCustomers.length === 0
+                        ? <p className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No customers found</p>
+                        : filteredCustomers.map(c => (
+                          <button key={c.id} type="button"
+                            onClick={() => { setApplyForm({ ...applyForm, customer_id: String(c.id) }); setCustomerSearch(''); setShowCustomerDropdown(false) }}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
+                            {c.first_name} {c.last_name}
+                          </button>
+                        ))}
                     </div>
                   )}
                 </div>
-                {applyForm.customer_id && (
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                    ✓ {selectedCustomer?.first_name} {selectedCustomer?.last_name} selected
-                  </p>
-                )}
+                {applyForm.customer_id && <p className="text-xs text-green-600 dark:text-green-400 mt-1">✓ {selectedCustomer?.first_name} {selectedCustomer?.last_name} selected</p>}
               </div>
-
-              {/* Loan Product */}
               <div>
                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">Loan Product *</label>
                 <select value={applyForm.loan_product_id} onChange={e => setApplyForm({ ...applyForm, loan_product_id: e.target.value })}
@@ -443,35 +427,24 @@ export default function ReviewApplications() {
                   {loanProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">Amount (₦) *</label>
-                <input type="number" value={applyForm.requested_amount}
-                  onChange={e => setApplyForm({ ...applyForm, requested_amount: e.target.value })}
-                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                  placeholder="0.00" required />
+                <input type="number" value={applyForm.requested_amount} onChange={e => setApplyForm({ ...applyForm, requested_amount: e.target.value })}
+                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" placeholder="0.00" required />
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">Tenure (months) *</label>
-                <input type="number" value={applyForm.tenure_months}
-                  onChange={e => setApplyForm({ ...applyForm, tenure_months: e.target.value })}
-                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                  placeholder="e.g. 6" required />
+                <input type="number" value={applyForm.tenure_months} onChange={e => setApplyForm({ ...applyForm, tenure_months: e.target.value })}
+                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" placeholder="e.g. 6" required />
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">Purpose</label>
                 <textarea value={applyForm.purpose} onChange={e => setApplyForm({ ...applyForm, purpose: e.target.value })}
-                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                  rows="2" placeholder="Optional..." />
+                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" rows="2" placeholder="Optional..." />
               </div>
-
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setApplyModal(false)}
-                  className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
-                <button type="submit" disabled={applying}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
+                <button type="button" onClick={() => setApplyModal(false)} className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+                <button type="submit" disabled={applying} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
                   {applying ? 'Submitting...' : 'Submit Application'}
                 </button>
               </div>
@@ -539,7 +512,25 @@ export default function ReviewApplications() {
 
               {canReview(viewModal) && (
                 <div className="border-t dark:border-gray-700 pt-4">
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Your Review</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Your Review</p>
+
+                  {/* Disbursement Date — only shown to CEO when approving */}
+                  {isCEO && viewModal.status === 'manager_approved' && (
+                    <div className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                      <label className="flex items-center gap-2 text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-2">
+                        <Calendar size={15} /> Disbursement Date
+                      </label>
+                      <input
+                        type="date"
+                        value={disbursementDate}
+                        onChange={e => setDisbursementDate(e.target.value)}
+                        max={new Date().toISOString().split('T')[0]}
+                        className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+                      />
+                      <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">Set a past date to backdate this disbursement</p>
+                    </div>
+                  )}
+
                   <textarea value={reviewComments} onChange={e => setReviewComments(e.target.value)}
                     placeholder="Add your comments (optional)"
                     className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white mb-3" rows="3" />
