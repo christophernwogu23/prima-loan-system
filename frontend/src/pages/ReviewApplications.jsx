@@ -170,8 +170,8 @@ export default function ReviewApplications() {
         tenure_months: parseInt(editModal.tenure_months),
         status: editModal.status,
         purpose: editModal.purpose,
-        created_at: editModal.created_at ? new Date(editModal.created_at).toISOString() : null,
-        approved_at: editModal.created_at ? new Date(editModal.created_at).toISOString() : null,
+        created_at: editModal.created_at ? `${editModal.created_at}T00:00:00` : null,
+        approved_at: editModal.created_at ? `${editModal.created_at}T00:00:00` : null,
       })
       toast.success('Application updated successfully!')
       setEditModal(null)
