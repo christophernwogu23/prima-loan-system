@@ -8,6 +8,7 @@ class PaymentCreate(BaseModel):
     payment_method: str
     reference_number: Optional[str] = None
     notes: Optional[str] = None
+    payment_date: Optional[str] = None  
 
 class PaymentResponse(BaseModel):
     id: int
