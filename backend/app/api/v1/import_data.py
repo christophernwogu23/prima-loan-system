@@ -387,6 +387,8 @@ async def import_loans(
                 email = generate_email(name)
                 customer = db.query(User).filter(User.email == email).first()
 
+                officer_id = officers.get(officer_name)
+
                 if not customer:
                     name_parts = name.split()
                     customer = User(
@@ -395,12 +397,14 @@ async def import_loans(
                         first_name=name_parts[0],
                         last_name=' '.join(name_parts[1:]) if len(name_parts) > 1 else '',
                         role="customer",
-                        status="active"
+                        status="active",
+                        assigned_officer_id=officer_id
                     )
                     db.add(customer)
                     db.flush()
                     created_customers += 1
-                    officer_id = officers.get(officer_name)
+                else:
+                    # Always update officer assignment even for existing customers
                     if officer_id:
                         customer.assigned_officer_id = officer_id
 
