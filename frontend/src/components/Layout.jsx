@@ -121,6 +121,7 @@ export default function Layout({ children }) {
     { path: '/users', label: 'Users', icon: Users },
     { path: '/accounts', label: 'Accounts', icon: Wallet },
     { path: '/review-applications', label: 'All Applications', icon: ClipboardList },
+    { path: '/customer-assignment', label: 'Customer Assignment', icon: UserCheck },
     { path: '/settings', label: 'Settings', icon: Settings },
     { path: '/reports', label: 'Analytics', icon: BarChart3 },
     { path: '/defaults', label: 'Defaults', icon: AlertTriangle },
