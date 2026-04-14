@@ -30,6 +30,10 @@ EXPENSE_CATEGORIES = [
     "Professional Fees",
     "Audit Fees",
     "Insurance Expense",
+    "Postage & Communications",
+    "Plant & Equipment Depreciation",
+    "Motor Vehicle Depreciation",
+    "Software Amortisation",
     "Other Expense"
 ]
 
