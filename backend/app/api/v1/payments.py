@@ -185,13 +185,21 @@ def get_loan_payment_summary(
     total_paid = db.query(func.sum(Payment.amount)).filter(Payment.loan_application_id == loan_id).scalar() or 0
     payment_count = db.query(func.count(Payment.id)).filter(Payment.loan_application_id == loan_id).scalar()
 
+    principal = loan.approved_amount or loan.requested_amount
+    interest_rate = loan.interest_rate or 0
+    interest_amount = principal * (interest_rate / 100)
+    total_loan_balance = principal + interest_amount  # Full amount customer owes
+
     return {
         "loan_id": loan_id,
-        "loan_amount": loan.requested_amount,
+        "loan_amount": principal,
+        "interest_rate": interest_rate,
+        "interest_amount": interest_amount,
+        "total_loan_balance": total_loan_balance,
         "total_paid": total_paid,
-        "remaining_balance": loan.requested_amount - total_paid,
+        "remaining_balance": total_loan_balance - total_paid,
         "payment_count": payment_count,
-        "is_fully_paid": total_paid >= loan.requested_amount
+        "is_fully_paid": total_paid >= total_loan_balance
     }
 
 
@@ -213,13 +221,20 @@ def get_disbursed_loans(
     loans = []
     for loan, first_name, last_name, product_name in results:
         total_paid = db.query(func.sum(Payment.amount)).filter(Payment.loan_application_id == loan.id).scalar() or 0
+        principal = loan.approved_amount or loan.requested_amount
+        interest_rate = loan.interest_rate or 0
+        interest_amount = principal * (interest_rate / 100)
+        total_loan_balance = principal + interest_amount
         loans.append({
             "id": loan.id,
             "customer_name": f"{first_name} {last_name}",
             "product_name": product_name,
-            "amount": loan.requested_amount,
+            "amount": principal,
+            "interest_rate": interest_rate,
+            "interest_amount": interest_amount,
+            "total_loan_balance": total_loan_balance,
             "total_paid": total_paid,
-            "remaining": loan.requested_amount - total_paid
+            "remaining": total_loan_balance - total_paid
         })
     return loans
 

@@ -321,7 +321,7 @@ export default function Payments() {
                   <option value="">Choose a loan...</option>
                   {filteredLoans.map(loan => (
                     <option key={loan.id} value={loan.id}>
-                      {loan.customer_name} - {loan.product_name} ({formatCurrency(loan.amount)})
+                      {loan.customer_name} - {loan.product_name} | Total: {formatCurrency(loan.total_loan_balance)} | Rem: {formatCurrency(loan.remaining)}
                     </option>
                   ))}
                 </select>
@@ -329,10 +329,12 @@ export default function Payments() {
               </div>
 
               {loanSummary && (
-                <div className="bg-gray-50 dark:bg-gray-700 border dark:border-gray-600 p-3 rounded-lg text-sm">
-                  <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Loan Amount:</span><span className="font-medium dark:text-white">{formatCurrency(loanSummary.loan_amount)}</span></div>
+                <div className="bg-gray-50 dark:bg-gray-700 border dark:border-gray-600 p-3 rounded-lg text-sm space-y-1">
+                  <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Principal:</span><span className="font-medium dark:text-white">{formatCurrency(loanSummary.loan_amount)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Interest ({loanSummary.interest_rate}%):</span><span className="font-medium dark:text-white">{formatCurrency(loanSummary.interest_amount)}</span></div>
+                  <div className="flex justify-between border-t dark:border-gray-600 pt-1"><span className="text-gray-600 dark:text-gray-400">Total Owed:</span><span className="font-bold dark:text-white">{formatCurrency(loanSummary.total_loan_balance)}</span></div>
                   <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Total Paid:</span><span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(loanSummary.total_paid)}</span></div>
-                  <div className="flex justify-between border-t dark:border-gray-600 mt-2 pt-2"><span className="text-gray-600 dark:text-gray-400">Remaining:</span><span className="font-bold text-blue-600 dark:text-blue-400">{formatCurrency(loanSummary.remaining_balance)}</span></div>
+                  <div className="flex justify-between border-t dark:border-gray-600 pt-1"><span className="text-gray-600 dark:text-gray-400">Remaining:</span><span className="font-bold text-blue-600 dark:text-blue-400">{formatCurrency(loanSummary.remaining_balance)}</span></div>
                 </div>
               )}
 
