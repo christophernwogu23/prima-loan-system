@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import Layout from '../components/Layout'
-import { useAuthStore } from '../store/authStore'
-import client from '../api/client'
+import Layout from '../../components/Layout'
+import { useAuthStore } from '../../store/authStore'
+import client from '../../api/client'
 import toast from 'react-hot-toast'
 import { Plus, X, Trash2, Search, Calendar, RefreshCw } from 'lucide-react'
 
