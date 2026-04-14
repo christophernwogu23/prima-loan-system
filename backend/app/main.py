@@ -5,6 +5,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from app.config import settings
 from app.database import Base, engine, SessionLocal
 from app.models.upfront_charge import UpfrontCharge
+from app.models.fixed_deposit_transaction import FixedDepositTransaction
 
 # Import models so they're registered with Base
 from app.models.transit_account import TransitDeposit
