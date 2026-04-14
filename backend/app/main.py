@@ -4,6 +4,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from app.config import settings
 from app.database import Base, engine, SessionLocal
+from app.models.upfront_charge import UpfrontCharge
 
 # Import models so they're registered with Base
 from app.models.transit_account import TransitDeposit
@@ -175,6 +176,9 @@ app.include_router(transit_router, prefix="/api/v1")
 
 from app.api.v1.suspense_account import router as suspense_router
 app.include_router(suspense_router, prefix="/api/v1")
+
+from app.api.v1.upfront import router as upfront_router
+app.include_router(upfront_router, prefix="/api/v1")
 
 print("=== LOADING GL ROUTER ===", flush=True)
 from app.api.v1.general_ledger import router as gl_router
