@@ -186,9 +186,17 @@ def get_loan_payment_summary(
     payment_count = db.query(func.count(Payment.id)).filter(Payment.loan_application_id == loan_id).scalar()
 
     principal = loan.approved_amount or loan.requested_amount
+    is_imported = loan.application_number and loan.application_number.startswith("IMP-")
     interest_rate = loan.interest_rate or 0
-    interest_amount = principal * (interest_rate / 100)
-    total_loan_balance = principal + interest_amount  # Full amount customer owes
+
+    if is_imported:
+        # Imported loans: balance already includes interest
+        interest_amount = 0.0
+        total_loan_balance = principal
+    else:
+        # New system loans: add flat rate interest
+        interest_amount = principal * (interest_rate / 100)
+        total_loan_balance = principal + interest_amount
 
     return {
         "loan_id": loan_id,
@@ -222,9 +230,15 @@ def get_disbursed_loans(
     for loan, first_name, last_name, product_name in results:
         total_paid = db.query(func.sum(Payment.amount)).filter(Payment.loan_application_id == loan.id).scalar() or 0
         principal = loan.approved_amount or loan.requested_amount
+        is_imported = loan.application_number and loan.application_number.startswith("IMP-")
         interest_rate = loan.interest_rate or 0
-        interest_amount = principal * (interest_rate / 100)
-        total_loan_balance = principal + interest_amount
+
+        if is_imported:
+            interest_amount = 0.0
+            total_loan_balance = principal
+        else:
+            interest_amount = principal * (interest_rate / 100)
+            total_loan_balance = principal + interest_amount
         loans.append({
             "id": loan.id,
             "customer_name": f"{first_name} {last_name}",

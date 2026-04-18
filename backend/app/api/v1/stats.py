@@ -22,8 +22,13 @@ router = APIRouter(prefix="/stats", tags=["Statistics"])
 
 
 def calc_loan_total(loan):
-    """Principal + flat rate interest"""
+    """
+    For imported loans (IMP- prefix): balance already includes interest, use as-is.
+    For new system loans: principal + flat rate interest using the loan's actual rate.
+    """
     principal = loan.approved_amount or loan.requested_amount or 0
+    if loan.application_number and loan.application_number.startswith("IMP-"):
+        return principal  # Interest already baked in
     rate = loan.interest_rate or 0
     return principal * (1 + rate / 100)
 
