@@ -15,17 +15,23 @@ router = APIRouter(prefix="/upfront", tags=["Upfront Charges"])
 BVN_AMOUNT = 1000.0
 LOAN_FORM_AMOUNT = 1000.0
 CREDIT_SEARCH_AMOUNT = 1000.0
+ADMIN_FEE_RATE = 0.01    # 1% of loan amount
+INSURANCE_RATE = 0.02    # 2% of loan amount
 
 
 class UpfrontChargeCreate(BaseModel):
     loan_application_id: int
+    # Percentage-based (auto-calculated from loan amount)
+    admin_fee: float = 0.0        # 1% of loan
+    insurance_fee: float = 0.0   # 2% of loan
+    # Flat charges
     bvn_charge: float = 0.0
     loan_form_charge: float = 0.0
     credit_search_charge: float = 0.0
     other_charge: float = 0.0
     other_charge_label: Optional[str] = None
     is_first_timer: bool = False
-    charge_date: Optional[str] = None  # "2025-01-15"
+    charge_date: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -70,12 +76,25 @@ def create_upfront_charge(
     if current_user.role == "loan_officer" and loan.assigned_officer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Loan not assigned to you")
 
-    # Validate: BVN charge only for first-timers
+    # Block upfront for imported loans
+    if loan.application_number and loan.application_number.startswith("IMP-"):
+        raise HTTPException(status_code=400, detail="Upfront charges do not apply to imported loans")
+
+    # BVN only for first-timers
     bvn = data.bvn_charge if data.is_first_timer else 0.0
 
-    total = bvn + data.loan_form_charge + data.credit_search_charge + data.other_charge
+    total = (
+        data.admin_fee +
+        data.insurance_fee +
+        bvn +
+        data.loan_form_charge +
+        data.credit_search_charge +
+        data.other_charge
+    )
 
-    # Parse charge date
+    if total <= 0:
+        raise HTTPException(status_code=400, detail="At least one charge must be selected")
+
     if data.charge_date:
         try:
             charge_dt = datetime.strptime(data.charge_date, "%Y-%m-%d")
@@ -89,8 +108,10 @@ def create_upfront_charge(
         bvn_charge=bvn,
         loan_form_charge=data.loan_form_charge,
         credit_search_charge=data.credit_search_charge,
-        other_charge=data.other_charge,
-        other_charge_label=data.other_charge_label,
+        other_charge=data.other_charge + data.admin_fee + data.insurance_fee,  # store extras in other
+        other_charge_label=f"Admin Fee + Insurance" if (data.admin_fee > 0 and data.insurance_fee > 0) else (
+            "Admin Fee" if data.admin_fee > 0 else "Insurance" if data.insurance_fee > 0 else data.other_charge_label
+        ),
         total_charge=total,
         is_first_timer=data.is_first_timer,
         charge_date=charge_dt,

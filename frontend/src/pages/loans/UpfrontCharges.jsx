@@ -8,6 +8,8 @@ import { Plus, X, Trash2, Search, Calendar, RefreshCw } from 'lucide-react'
 const BVN_AMOUNT = 1000
 const LOAN_FORM_AMOUNT = 1000
 const CREDIT_SEARCH_AMOUNT = 1000
+const ADMIN_FEE_RATE = 0.01   // 1%
+const INSURANCE_RATE = 0.02   // 2%
 
 const today = () => new Date().toISOString().split('T')[0]
 
@@ -31,6 +33,10 @@ export default function UpfrontCharges() {
   const [form, setForm] = useState({
     loan_application_id: '',
     is_first_timer: false,
+    // percentage-based
+    admin_fee: 0,
+    insurance_fee: 0,
+    // flat
     bvn_charge: 0,
     loan_form_charge: 0,
     credit_search_charge: 0,
@@ -80,23 +86,35 @@ export default function UpfrontCharges() {
   }
 
   const selectedLoan = loans.find(l => l.id === parseInt(form.loan_application_id))
+  const loanAmount = selectedLoan?.total_loan_balance || selectedLoan?.amount || 0
+  const isImported = selectedLoan?.customer_name && loans.find(l => l.id === parseInt(form.loan_application_id))?.application_number?.startsWith('IMP-')
+
   const filteredLoans = loans.filter(l => {
     if (!loanSearch) return true
     const s = loanSearch.toLowerCase()
     return l.customer_name?.toLowerCase().includes(s) || l.product_name?.toLowerCase().includes(s)
   })
 
-  const total = (form.is_first_timer ? form.bvn_charge : 0) +
+  // Auto-calculated fee amounts
+  const adminFeeAmount = form.admin_fee ? Math.round(loanAmount * ADMIN_FEE_RATE) : 0
+  const insuranceFeeAmount = form.insurance_fee ? Math.round(loanAmount * INSURANCE_RATE) : 0
+
+  const total = adminFeeAmount + insuranceFeeAmount +
+    (form.is_first_timer ? form.bvn_charge : 0) +
     form.loan_form_charge + form.credit_search_charge + form.other_charge
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.loan_application_id) return toast.error('Please select a loan')
+    if (isImported) return toast.error('Upfront charges do not apply to imported loans')
+    if (total === 0) return toast.error('Please select at least one charge')
     setSubmitting(true)
     try {
       await client.post('/upfront/', {
         ...form,
         loan_application_id: parseInt(form.loan_application_id),
+        admin_fee: adminFeeAmount,
+        insurance_fee: insuranceFeeAmount,
         bvn_charge: form.is_first_timer ? parseFloat(form.bvn_charge) : 0,
         loan_form_charge: parseFloat(form.loan_form_charge),
         credit_search_charge: parseFloat(form.credit_search_charge),
@@ -285,9 +303,51 @@ export default function UpfrontCharges() {
                 <p className="text-xs text-gray-500 mt-1">Can differ from disbursement date</p>
               </div>
 
+              {/* Imported loan warning */}
+              {isImported && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                  <p className="text-sm text-red-700 dark:text-red-400">⚠️ Upfront charges do not apply to imported loans.</p>
+                </div>
+              )}
+
               {/* Charge items */}
+              {!isImported && (
               <div className="border dark:border-gray-600 rounded-lg p-4 space-y-3">
                 <p className="text-sm font-medium dark:text-gray-300 mb-2">Select Applicable Charges</p>
+
+                {/* Admin Fee — 1% of loan */}
+                <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <input type="checkbox" id="admin"
+                      checked={form.admin_fee > 0}
+                      onChange={e => setForm({ ...form, admin_fee: e.target.checked ? 1 : 0 })}
+                      className="w-4 h-4 rounded" disabled={!loanAmount} />
+                    <div>
+                      <label htmlFor="admin" className="text-sm font-medium dark:text-white cursor-pointer">Admin Fee (1%)</label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">1% of loan amount</p>
+                    </div>
+                  </div>
+                  <span className={`text-sm font-bold ${form.admin_fee > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`}>
+                    {formatCurrency(adminFeeAmount)}
+                  </span>
+                </div>
+
+                {/* Insurance — 2% of loan */}
+                <div className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <input type="checkbox" id="insurance"
+                      checked={form.insurance_fee > 0}
+                      onChange={e => setForm({ ...form, insurance_fee: e.target.checked ? 1 : 0 })}
+                      className="w-4 h-4 rounded" disabled={!loanAmount} />
+                    <div>
+                      <label htmlFor="insurance" className="text-sm font-medium dark:text-white cursor-pointer">Insurance (2%)</label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">2% of loan amount</p>
+                    </div>
+                  </div>
+                  <span className={`text-sm font-bold ${form.insurance_fee > 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400'}`}>
+                    {formatCurrency(insuranceFeeAmount)}
+                  </span>
+                </div>
 
                 {/* BVN — first-timers only */}
                 <div className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
@@ -298,7 +358,7 @@ export default function UpfrontCharges() {
                       className="w-4 h-4 rounded" />
                     <div>
                       <label htmlFor="bvn" className="text-sm font-medium dark:text-white cursor-pointer">BVN Charge</label>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">First-time customers only</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">First-time customers only — ₦1,000</p>
                     </div>
                   </div>
                   <span className={`text-sm font-bold ${form.is_first_timer ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400'}`}>
@@ -313,7 +373,7 @@ export default function UpfrontCharges() {
                       checked={form.loan_form_charge > 0}
                       onChange={e => setForm({ ...form, loan_form_charge: e.target.checked ? LOAN_FORM_AMOUNT : 0 })}
                       className="w-4 h-4 rounded" />
-                    <label htmlFor="form" className="text-sm font-medium dark:text-white cursor-pointer">Loan Form</label>
+                    <label htmlFor="form" className="text-sm font-medium dark:text-white cursor-pointer">Loan Form — ₦1,000</label>
                   </div>
                   <span className={`text-sm font-bold ${form.loan_form_charge > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`}>
                     {formatCurrency(LOAN_FORM_AMOUNT)}
@@ -327,14 +387,14 @@ export default function UpfrontCharges() {
                       checked={form.credit_search_charge > 0}
                       onChange={e => setForm({ ...form, credit_search_charge: e.target.checked ? CREDIT_SEARCH_AMOUNT : 0 })}
                       className="w-4 h-4 rounded" />
-                    <label htmlFor="credit" className="text-sm font-medium dark:text-white cursor-pointer">Credit Search</label>
+                    <label htmlFor="credit" className="text-sm font-medium dark:text-white cursor-pointer">Credit Search — ₦1,000</label>
                   </div>
                   <span className={`text-sm font-bold ${form.credit_search_charge > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400'}`}>
                     {formatCurrency(CREDIT_SEARCH_AMOUNT)}
                   </span>
                 </div>
 
-                {/* Other charge */}
+                {/* Other */}
                 <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-2">
                   <div className="flex items-center gap-3">
                     <input type="checkbox" id="other"
@@ -344,7 +404,7 @@ export default function UpfrontCharges() {
                     <label htmlFor="other" className="text-sm font-medium dark:text-white cursor-pointer">Other Charge</label>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mt-2">
-                    <input type="text" placeholder="Label (e.g. Insurance)"
+                    <input type="text" placeholder="Label (e.g. Legal Fee)"
                       value={form.other_charge_label}
                       onChange={e => setForm({ ...form, other_charge_label: e.target.value })}
                       className="px-3 py-1.5 border dark:border-gray-600 rounded dark:bg-gray-600 dark:text-white text-sm" />
@@ -355,6 +415,7 @@ export default function UpfrontCharges() {
                   </div>
                 </div>
               </div>
+              )}
 
               {/* Total */}
               <div className="flex justify-between items-center bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3">
