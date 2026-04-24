@@ -82,7 +82,7 @@ async def create_shareholder(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in ["admin", "ceo"]:
+    if current_user.role not in ["admin", "ceo", "manager"]:
         raise HTTPException(status_code=403, detail="Access denied")
 
     shareholder = Shareholder(name=data.name, capital=data.capital, notes=data.notes)
@@ -112,7 +112,7 @@ async def update_shareholder(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in ["admin", "ceo"]:
+    if current_user.role not in ["admin", "ceo", "manager"]:
         raise HTTPException(status_code=403, detail="Access denied")
 
     shareholder = db.query(Shareholder).filter(Shareholder.id == shareholder_id).first()
@@ -164,7 +164,7 @@ async def record_shareholder_transaction(
     current_user: User = Depends(get_current_user)
 ):
     """Record a capital injection or drawing for a shareholder"""
-    if current_user.role not in ["admin", "ceo"]:
+    if current_user.role not in ["admin", "ceo", "manager"]:
         raise HTTPException(status_code=403, detail="Access denied")
 
     if data.transaction_type not in ["injection", "drawing"]:

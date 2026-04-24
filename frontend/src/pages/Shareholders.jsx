@@ -19,7 +19,7 @@ export default function Shareholders() {
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [formData, setFormData] = useState({ name: '', capital: '', notes: '' })
-  const [txnModal, setTxnModal] = useState(null) // { shareholder, type }
+  const [txnModal, setTxnModal] = useState(null)
   const [txnForm, setTxnForm] = useState({ amount: '', transaction_date: today(), notes: '' })
   const [historyModal, setHistoryModal] = useState(null)
   const [historyData, setHistoryData] = useState(null)
@@ -28,7 +28,7 @@ export default function Shareholders() {
   const [deleting, setDeleting] = useState(false)
 
   const isAdmin = user?.role === 'admin'
-  const canEdit = ['admin', 'ceo'].includes(user?.role)
+  const canEdit = ['admin', 'ceo', 'manager'].includes(user?.role)
 
   useEffect(() => { fetchData() }, [])
 
@@ -185,21 +185,18 @@ export default function Shareholders() {
                   <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{s.notes || '—'}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1">
-                      {/* Inject capital */}
                       {canEdit && (
                         <button onClick={() => openTxnModal(s, 'injection')}
                           className="p-1.5 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded" title="Capital Injection">
                           <ArrowDownCircle size={16} />
                         </button>
                       )}
-                      {/* Drawing */}
                       {canEdit && (
                         <button onClick={() => openTxnModal(s, 'drawing')}
                           className="p-1.5 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded" title="Drawing">
                           <ArrowUpCircle size={16} />
                         </button>
                       )}
-                      {/* History */}
                       <button onClick={() => openHistory(s)}
                         className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded" title="Transaction History">
                         <History size={16} />
