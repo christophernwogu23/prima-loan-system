@@ -6,13 +6,14 @@ from pydantic import BaseModel
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.models.savings import Savings
+from app.models.savings_transaction import SavingsTransaction
 from app.schemas.savings import SavingsUpdate, SavingsResponse
 
 router = APIRouter(prefix="/savings", tags=["savings"])
 
 
 class TransactionRequest(BaseModel):
-    user_id: Optional[int] = None  # Staff pass user_id; customers omit it
+    user_id: Optional[int] = None
     amount: float
     note: Optional[str] = None
 
@@ -33,8 +34,7 @@ def get_all_savings(
 ):
     if current_user.role not in ["admin", "ceo", "manager", "loan_officer"]:
         raise HTTPException(status_code=403, detail="Access denied")
-    savings = db.query(Savings).all()
-    return savings
+    return db.query(Savings).all()
 
 
 @router.get("/user/{user_id}")
@@ -49,15 +49,57 @@ def get_user_savings(
     return {"user_id": user_id, "balance": savings.balance if savings else 0.0}
 
 
+@router.get("/transactions/my")
+def get_my_transactions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Customer views their own transaction history"""
+    txns = db.query(SavingsTransaction).filter(
+        SavingsTransaction.user_id == current_user.id
+    ).order_by(SavingsTransaction.created_at.desc()).all()
+    return _format_transactions(txns, db)
+
+
+@router.get("/transactions/{user_id}")
+def get_user_transactions(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Staff views a specific customer's transaction history"""
+    if current_user.role not in ["admin", "ceo", "manager", "loan_officer"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    txns = db.query(SavingsTransaction).filter(
+        SavingsTransaction.user_id == user_id
+    ).order_by(SavingsTransaction.created_at.desc()).all()
+    return _format_transactions(txns, db)
+
+
+def _format_transactions(txns, db: Session):
+    result = []
+    for t in txns:
+        posted_by = db.query(User).filter(User.id == t.created_by_id).first() if t.created_by_id else None
+        result.append({
+            "id": t.id,
+            "type": t.type,
+            "amount": t.amount,
+            "balance_after": t.balance_after,
+            "note": t.note,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+            "posted_by": f"{posted_by.first_name} {posted_by.last_name}" if posted_by else "System"
+        })
+    return result
+
+
 @router.post("/deposit")
 def deposit_savings(
     data: TransactionRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Determine target user
     if current_user.role == "customer":
-        target_user_id = current_user.id  # Customers always deposit into their own account
+        target_user_id = current_user.id
     elif current_user.role in ["admin", "manager", "loan_officer"]:
         if not data.user_id:
             raise HTTPException(status_code=400, detail="user_id is required for staff")
@@ -74,7 +116,18 @@ def deposit_savings(
     else:
         savings = Savings(user_id=target_user_id, balance=data.amount)
         db.add(savings)
+    db.flush()
 
+    # Log the transaction
+    txn = SavingsTransaction(
+        user_id=target_user_id,
+        type="deposit",
+        amount=data.amount,
+        balance_after=savings.balance,
+        note=data.note,
+        created_by_id=current_user.id
+    )
+    db.add(txn)
     db.commit()
     db.refresh(savings)
     return {"message": "Deposit successful", "new_balance": savings.balance}
@@ -86,7 +139,6 @@ def withdraw_savings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Determine target user
     if current_user.role == "customer":
         target_user_id = current_user.id
     elif current_user.role in ["admin", "manager", "loan_officer"]:
@@ -104,6 +156,18 @@ def withdraw_savings(
         raise HTTPException(status_code=400, detail="Insufficient balance")
 
     savings.balance -= data.amount
+    db.flush()
+
+    # Log the transaction
+    txn = SavingsTransaction(
+        user_id=target_user_id,
+        type="withdraw",
+        amount=data.amount,
+        balance_after=savings.balance,
+        note=data.note,
+        created_by_id=current_user.id
+    )
+    db.add(txn)
     db.commit()
     db.refresh(savings)
     return {"message": "Withdrawal successful", "new_balance": savings.balance}
