@@ -15,13 +15,34 @@ export const getUserSavings = async (userId) => {
   return data
 }
 
-export const depositSavings = async (userId, amount) => {
-  const { data } = await client.post('/savings/deposit', { user_id: userId, amount })
+export const depositSavings = async (userId, amount, note = null, transactionDate = null) => {
+  const { data } = await client.post('/savings/deposit', {
+    user_id: userId,
+    amount,
+    note,
+    transaction_date: transactionDate
+  })
   return data
 }
 
-export const withdrawSavings = async (userId, amount) => {
-  const { data } = await client.post('/savings/withdraw', { user_id: userId, amount })
+export const withdrawSavings = async (userId, amount, note = null, transactionDate = null) => {
+  const { data } = await client.post('/savings/withdraw', {
+    user_id: userId,
+    amount,
+    note,
+    transaction_date: transactionDate
+  })
+  return data
+}
+
+export const transferSavings = async (fromUserId, toUserId, amount, note = null, transactionDate = null) => {
+  const { data } = await client.post('/savings/transfer', {
+    from_user_id: fromUserId,
+    to_user_id: toUserId,
+    amount,
+    note,
+    transaction_date: transactionDate
+  })
   return data
 }
 

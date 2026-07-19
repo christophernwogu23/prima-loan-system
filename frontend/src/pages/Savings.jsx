@@ -5,7 +5,7 @@ import client from '../api/client'
 import toast from 'react-hot-toast'
 import {
   Wallet, ArrowDownCircle, ArrowUpCircle, Trash2, X,
-  RefreshCw, History, TrendingUp, TrendingDown, User
+  RefreshCw, History, TrendingUp, TrendingDown, User, Search, ArrowLeftRight
 } from 'lucide-react'
 
 const formatCurrency = (amount) =>
@@ -24,6 +24,9 @@ const formatDateTime = (dateStr) => {
   })
 }
 
+// Today's date as YYYY-MM-DD, for defaulting the date input
+const todayStr = () => new Date().toISOString().slice(0, 10)
+
 export default function Savings() {
   const { user } = useAuthStore()
 
@@ -36,6 +39,7 @@ export default function Savings() {
 
   // Staff state
   const [savingsData, setSavingsData] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [selectedHistory, setSelectedHistory] = useState(null) // { user_id, name, txns[] }
   const [historyLoading, setHistoryLoading] = useState(false)
 
@@ -43,7 +47,17 @@ export default function Savings() {
   const [txModal, setTxModal] = useState(null)
   const [txAmount, setTxAmount] = useState('')
   const [txNote, setTxNote] = useState('')
+  const [txDate, setTxDate] = useState(todayStr())
   const [txLoading, setTxLoading] = useState(false)
+
+  // Transfer modal
+  const [transferModal, setTransferModal] = useState(false)
+  const [transferFrom, setTransferFrom] = useState('')
+  const [transferTo, setTransferTo] = useState('')
+  const [transferAmount, setTransferAmount] = useState('')
+  const [transferNote, setTransferNote] = useState('')
+  const [transferDate, setTransferDate] = useState(todayStr())
+  const [transferLoading, setTransferLoading] = useState(false)
 
   // Delete modal
   const [deleteModal, setDeleteModal] = useState(null)
@@ -103,6 +117,7 @@ export default function Savings() {
     setTxModal({ type, user_id: userId, name, balance })
     setTxAmount('')
     setTxNote('')
+    setTxDate(todayStr())
   }
 
   const handleTransaction = async (e) => {
@@ -110,10 +125,15 @@ export default function Savings() {
     const amount = parseFloat(txAmount)
     if (!amount || amount <= 0) return toast.error('Enter a valid amount')
     if (txModal.type === 'withdraw' && amount > txModal.balance) return toast.error('Insufficient balance')
+    if (!txDate) return toast.error('Select a posting date')
 
     setTxLoading(true)
     try {
-      const payload = { amount, note: txNote || null }
+      const payload = {
+        amount,
+        note: txNote || null,
+        transaction_date: new Date(`${txDate}T00:00:00`).toISOString()
+      }
       if (!isCustomer && txModal.user_id) payload.user_id = txModal.user_id
 
       await client.post(`/savings/${txModal.type}`, payload)
@@ -128,6 +148,44 @@ export default function Savings() {
       toast.error(err.response?.data?.detail || 'Transaction failed')
     } finally {
       setTxLoading(false)
+    }
+  }
+
+  const openTransferModal = () => {
+    setTransferFrom('')
+    setTransferTo('')
+    setTransferAmount('')
+    setTransferNote('')
+    setTransferDate(todayStr())
+    setTransferModal(true)
+  }
+
+  const handleTransfer = async (e) => {
+    e.preventDefault()
+    if (!transferFrom || !transferTo) return toast.error('Select both customers')
+    if (transferFrom === transferTo) return toast.error('Cannot transfer to the same customer')
+    const amount = parseFloat(transferAmount)
+    if (!amount || amount <= 0) return toast.error('Enter a valid amount')
+    const source = savingsData.find(s => String(s.user_id) === String(transferFrom))
+    if (source && amount > source.balance) return toast.error('Insufficient balance in source account')
+    if (!transferDate) return toast.error('Select a posting date')
+
+    setTransferLoading(true)
+    try {
+      await client.post('/savings/transfer', {
+        from_user_id: Number(transferFrom),
+        to_user_id: Number(transferTo),
+        amount,
+        note: transferNote || null,
+        transaction_date: new Date(`${transferDate}T00:00:00`).toISOString()
+      })
+      toast.success('Transfer successful!')
+      setTransferModal(false)
+      loadData()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Transfer failed')
+    } finally {
+      setTransferLoading(false)
     }
   }
 
@@ -148,6 +206,10 @@ export default function Savings() {
   }
 
   const totalSavings = savingsData.reduce((s, r) => s + r.balance, 0)
+
+  const filteredSavingsData = savingsData.filter(row =>
+    row.name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   if (loading) {
     return (
@@ -173,10 +235,18 @@ export default function Savings() {
               {isCustomer ? 'Manage your savings and view transaction history' : 'Manage customer savings'}
             </p>
           </div>
-          <button onClick={loadData}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-            <RefreshCw size={16} /> Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            {!isCustomer && (
+              <button onClick={openTransferModal}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium">
+                <ArrowLeftRight size={16} /> Transfer
+              </button>
+            )}
+            <button onClick={loadData}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+              <RefreshCw size={16} /> Refresh
+            </button>
+          </div>
         </div>
 
         {/* ══════════════════════════════════════
@@ -245,22 +315,22 @@ export default function Savings() {
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                     {myTransactions.map(t => (
                       <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                        <td className="px-6 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDateTime(t.created_at)}</td>
+                        <td className="px-6 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDateTime(t.transaction_date || t.created_at)}</td>
                         <td className="px-6 py-3">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                            t.type === 'deposit'
+                            t.type === 'deposit' || t.type === 'transfer_in'
                               ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                               : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
                           }`}>
-                            {t.type === 'deposit' ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                            {t.type.charAt(0).toUpperCase() + t.type.slice(1)}
+                            {t.type === 'deposit' || t.type === 'transfer_in' ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                            {t.type.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
                           </span>
                         </td>
                         <td className="px-6 py-3 text-gray-500 dark:text-gray-400">{t.note || '—'}</td>
                         <td className={`px-6 py-3 text-right font-semibold ${
-                          t.type === 'deposit' ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'
+                          t.type === 'deposit' || t.type === 'transfer_in' ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'
                         }`}>
-                          {t.type === 'deposit' ? '+' : '-'}{formatCurrency(t.amount)}
+                          {t.type === 'deposit' || t.type === 'transfer_in' ? '+' : '-'}{formatCurrency(t.amount)}
                         </td>
                         <td className="px-6 py-3 text-right dark:text-white">{formatCurrency(t.balance_after)}</td>
                       </tr>
@@ -308,60 +378,76 @@ export default function Savings() {
 
             {/* Accounts Tab */}
             {activeTab === 'accounts' && (
-              <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-700 border-b dark:border-gray-600 text-xs text-gray-500 dark:text-gray-300 uppercase">
-                    <tr>
-                      <th className="px-6 py-3 text-left">Customer</th>
-                      <th className="px-6 py-3 text-right">Balance</th>
-                      <th className="px-6 py-3 text-left">Last Updated</th>
-                      <th className="px-6 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                    {savingsData.length === 0 ? (
+              <div className="space-y-3">
+                {/* Search */}
+                <div className="relative max-w-sm">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    placeholder="Search customer by name..."
+                    className="w-full pl-9 pr-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white text-sm"
+                  />
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-700 border-b dark:border-gray-600 text-xs text-gray-500 dark:text-gray-300 uppercase">
                       <tr>
-                        <td colSpan={4} className="px-6 py-10 text-center text-gray-400">No savings accounts found</td>
+                        <th className="px-6 py-3 text-left">Customer</th>
+                        <th className="px-6 py-3 text-right">Balance</th>
+                        <th className="px-6 py-3 text-left">Last Updated</th>
+                        <th className="px-6 py-3 text-right">Actions</th>
                       </tr>
-                    ) : savingsData.map(row => (
-                      <tr key={row.user_id} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
-                        <td className="px-6 py-4 font-medium dark:text-white">{row.name}</td>
-                        <td className="px-6 py-4 text-right font-bold dark:text-white">{formatCurrency(row.balance)}</td>
-                        <td className="px-6 py-4 text-gray-400">{formatDate(row.updated_at)}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => { setActiveTab('history'); loadCustomerHistory(row.user_id, row.name) }}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg"
-                              title="View History">
-                              <History size={13} /> History
-                            </button>
-                            <button
-                              onClick={() => openTxModal('deposit', row.user_id, row.name, row.balance)}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 rounded-lg"
-                              title="Deposit">
-                              <ArrowDownCircle size={13} /> Deposit
-                            </button>
-                            <button
-                              onClick={() => openTxModal('withdraw', row.user_id, row.name, row.balance)}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/40 rounded-lg"
-                              title="Withdraw">
-                              <ArrowUpCircle size={13} /> Withdraw
-                            </button>
-                            {isAdmin && (
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                      {filteredSavingsData.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-10 text-center text-gray-400">
+                            {searchTerm ? 'No customers match your search' : 'No savings accounts found'}
+                          </td>
+                        </tr>
+                      ) : filteredSavingsData.map(row => (
+                        <tr key={row.user_id} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+                          <td className="px-6 py-4 font-medium dark:text-white">{row.name}</td>
+                          <td className="px-6 py-4 text-right font-bold dark:text-white">{formatCurrency(row.balance)}</td>
+                          <td className="px-6 py-4 text-gray-400">{formatDate(row.updated_at)}</td>
+                          <td className="px-6 py-4">
+                            <div className="flex justify-end gap-2">
                               <button
-                                onClick={() => setDeleteModal(row)}
-                                className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
-                                title="Delete">
-                                <Trash2 size={15} />
+                                onClick={() => { setActiveTab('history'); loadCustomerHistory(row.user_id, row.name) }}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg"
+                                title="View History">
+                                <History size={13} /> History
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                              <button
+                                onClick={() => openTxModal('deposit', row.user_id, row.name, row.balance)}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 rounded-lg"
+                                title="Deposit">
+                                <ArrowDownCircle size={13} /> Deposit
+                              </button>
+                              <button
+                                onClick={() => openTxModal('withdraw', row.user_id, row.name, row.balance)}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/40 rounded-lg"
+                                title="Withdraw">
+                                <ArrowUpCircle size={13} /> Withdraw
+                              </button>
+                              {isAdmin && (
+                                <button
+                                  onClick={() => setDeleteModal(row)}
+                                  className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+                                  title="Delete">
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
@@ -371,8 +457,18 @@ export default function Savings() {
                 {/* Customer Selector */}
                 <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-4">
                   <p className="text-sm font-medium dark:text-gray-300 mb-3">Select a customer to view transactions:</p>
+                  <div className="relative max-w-sm mb-3">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                      placeholder="Search customer by name..."
+                      className="w-full pl-9 pr-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white text-sm"
+                    />
+                  </div>
                   <div className="flex flex-wrap gap-2">
-                    {savingsData.map(row => (
+                    {filteredSavingsData.map(row => (
                       <button
                         key={row.user_id}
                         onClick={() => loadCustomerHistory(row.user_id, row.name)}
@@ -424,7 +520,7 @@ export default function Savings() {
                       <table className="w-full text-sm">
                         <thead className="bg-gray-50 dark:bg-gray-700 text-xs text-gray-500 dark:text-gray-400 uppercase">
                           <tr>
-                            <th className="px-6 py-3 text-left">Date & Time</th>
+                            <th className="px-6 py-3 text-left">Date</th>
                             <th className="px-6 py-3 text-left">Type</th>
                             <th className="px-6 py-3 text-left">Note</th>
                             <th className="px-6 py-3 text-left">Posted By</th>
@@ -435,23 +531,23 @@ export default function Savings() {
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                           {selectedHistory.txns.map(t => (
                             <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                              <td className="px-6 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDateTime(t.created_at)}</td>
+                              <td className="px-6 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDateTime(t.transaction_date || t.created_at)}</td>
                               <td className="px-6 py-3">
                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  t.type === 'deposit'
+                                  t.type === 'deposit' || t.type === 'transfer_in'
                                     ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                                     : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
                                 }`}>
-                                  {t.type === 'deposit' ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                                  {t.type.charAt(0).toUpperCase() + t.type.slice(1)}
+                                  {t.type === 'deposit' || t.type === 'transfer_in' ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                                  {t.type.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
                                 </span>
                               </td>
                               <td className="px-6 py-3 text-gray-500 dark:text-gray-400">{t.note || '—'}</td>
                               <td className="px-6 py-3 text-gray-500 dark:text-gray-400">{t.posted_by}</td>
                               <td className={`px-6 py-3 text-right font-semibold ${
-                                t.type === 'deposit' ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'
+                                t.type === 'deposit' || t.type === 'transfer_in' ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'
                               }`}>
-                                {t.type === 'deposit' ? '+' : '-'}{formatCurrency(t.amount)}
+                                {t.type === 'deposit' || t.type === 'transfer_in' ? '+' : '-'}{formatCurrency(t.amount)}
                               </td>
                               <td className="px-6 py-3 text-right dark:text-white">{formatCurrency(t.balance_after)}</td>
                             </tr>
@@ -512,6 +608,19 @@ export default function Savings() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-300">Posting Date *</label>
+                <input
+                  type="date" value={txDate} max={todayStr()}
+                  onChange={e => setTxDate(e.target.value)}
+                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+                  required
+                />
+                {txDate && txDate !== todayStr() && (
+                  <p className="text-xs text-amber-500 mt-1">This will be posted as a back-dated transaction</p>
+                )}
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">Note (Optional)</label>
                 <input
                   type="text" value={txNote}
@@ -531,6 +640,100 @@ export default function Savings() {
                     txModal.type === 'deposit' ? 'bg-green-600 hover:bg-green-700' : 'bg-orange-600 hover:bg-orange-700'
                   }`}>
                   {txLoading ? 'Processing...' : `Confirm ${txModal.type === 'deposit' ? 'Deposit' : 'Withdrawal'}`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════
+          Transfer Modal (Staff only)
+      ══════════════════════════════════════ */}
+      {transferModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-md shadow-2xl">
+            <div className="flex justify-between items-center px-6 py-4 border-b dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <ArrowLeftRight className="w-5 h-5 text-purple-600" />
+                <h3 className="font-semibold dark:text-white">Transfer Between Customers</h3>
+              </div>
+              <button onClick={() => setTransferModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={20} /></button>
+            </div>
+
+            <form onSubmit={handleTransfer} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-300">From Customer *</label>
+                <select
+                  value={transferFrom}
+                  onChange={e => setTransferFrom(e.target.value)}
+                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+                  required
+                >
+                  <option value="">Select customer...</option>
+                  {savingsData.map(row => (
+                    <option key={row.user_id} value={row.user_id}>
+                      {row.name} ({formatCurrency(row.balance)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-300">To Customer *</label>
+                <select
+                  value={transferTo}
+                  onChange={e => setTransferTo(e.target.value)}
+                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+                  required
+                >
+                  <option value="">Select customer...</option>
+                  {savingsData.filter(row => String(row.user_id) !== String(transferFrom)).map(row => (
+                    <option key={row.user_id} value={row.user_id}>
+                      {row.name} ({formatCurrency(row.balance)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-300">Amount (₦) *</label>
+                <input
+                  type="number" step="0.01" value={transferAmount}
+                  onChange={e => setTransferAmount(e.target.value)}
+                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+                  placeholder="0.00" required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-300">Posting Date *</label>
+                <input
+                  type="date" value={transferDate} max={todayStr()}
+                  onChange={e => setTransferDate(e.target.value)}
+                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-300">Note (Optional)</label>
+                <input
+                  type="text" value={transferNote}
+                  onChange={e => setTransferNote(e.target.value)}
+                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+                  placeholder="e.g. Reallocation..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => setTransferModal(false)}
+                  className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-lg dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 text-sm">
+                  Cancel
+                </button>
+                <button type="submit" disabled={transferLoading}
+                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm font-medium">
+                  {transferLoading ? 'Processing...' : 'Confirm Transfer'}
                 </button>
               </div>
             </form>

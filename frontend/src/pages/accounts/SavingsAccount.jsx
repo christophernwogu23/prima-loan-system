@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuthStore } from '../../store/authStore'
-import { ArrowLeft, Users, TrendingUp, ArrowDownCircle, ArrowUpCircle, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Users, TrendingUp, ArrowDownCircle, ArrowUpCircle, Trash2, X, Search } from 'lucide-react'
 import client from '../../api/client'
 import toast from 'react-hot-toast'
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(amount || 0)
+
+const todayStr = () => new Date().toISOString().slice(0, 10)
 
 export default function SavingsAccount() {
   const navigate = useNavigate()
@@ -16,11 +18,13 @@ export default function SavingsAccount() {
   const [customers, setCustomers] = useState([])
   const [stats, setStats] = useState({ total_balance: 0, accounts_count: 0 })
   const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
 
   // Transaction modal
   const [txModal, setTxModal] = useState(null) // { type, user_id, name, balance }
   const [txAmount, setTxAmount] = useState('')
   const [txNote, setTxNote] = useState('')
+  const [txDate, setTxDate] = useState(todayStr())
   const [txLoading, setTxLoading] = useState(false)
 
   // Delete modal
@@ -61,6 +65,7 @@ export default function SavingsAccount() {
     setTxModal({ type, user_id: saving.user_id, name: saving.name, balance: saving.balance })
     setTxAmount('')
     setTxNote('')
+    setTxDate(todayStr())
   }
 
   const handleTransaction = async (e) => {
@@ -68,13 +73,15 @@ export default function SavingsAccount() {
     const amount = parseFloat(txAmount)
     if (!amount || amount <= 0) return toast.error('Enter a valid amount')
     if (txModal.type === 'withdraw' && amount > txModal.balance) return toast.error('Insufficient balance')
+    if (!txDate) return toast.error('Select a posting date')
 
     setTxLoading(true)
     try {
       await client.post(`/savings/${txModal.type}`, {
         user_id: txModal.user_id,
         amount,
-        note: txNote || null
+        note: txNote || null,
+        transaction_date: new Date(`${txDate}T00:00:00`).toISOString()
       })
       toast.success(`${txModal.type === 'deposit' ? 'Deposit' : 'Withdrawal'} successful!`)
       setTxModal(null)
@@ -100,6 +107,10 @@ export default function SavingsAccount() {
       setDeleting(false)
     }
   }
+
+  const filteredSavings = savings.filter(s =>
+    s.name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   return (
     <Layout>
@@ -141,7 +152,19 @@ export default function SavingsAccount() {
 
             {/* Table */}
             <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg p-6">
-              <h3 className="text-lg font-semibold dark:text-white mb-4">Savings Accounts</h3>
+              <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
+                <h3 className="text-lg font-semibold dark:text-white">Savings Accounts</h3>
+                <div className="relative w-full sm:w-64">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    placeholder="Search customer by name..."
+                    className="w-full pl-9 pr-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+                  />
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="border-b dark:border-gray-700">
@@ -153,9 +176,11 @@ export default function SavingsAccount() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {savings.length === 0 ? (
-                      <tr><td colSpan={4} className="py-10 text-center text-gray-500 dark:text-gray-400">No savings accounts found</td></tr>
-                    ) : savings.map(saving => (
+                    {filteredSavings.length === 0 ? (
+                      <tr><td colSpan={4} className="py-10 text-center text-gray-500 dark:text-gray-400">
+                        {searchTerm ? 'No customers match your search' : 'No savings accounts found'}
+                      </td></tr>
+                    ) : filteredSavings.map(saving => (
                       <tr key={saving.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="py-3 text-sm dark:text-white">{saving.name}</td>
                         <td className="py-3 text-sm font-medium text-right text-green-600 dark:text-green-400">
@@ -231,6 +256,18 @@ export default function SavingsAccount() {
                 />
                 {txModal.type === 'withdraw' && txAmount && parseFloat(txAmount) > txModal.balance && (
                   <p className="text-xs text-red-500 mt-1">Amount exceeds available balance</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-300">Posting Date *</label>
+                <input
+                  type="date" value={txDate} max={todayStr()}
+                  onChange={e => setTxDate(e.target.value)}
+                  className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                  required
+                />
+                {txDate && txDate !== todayStr() && (
+                  <p className="text-xs text-amber-500 mt-1">This will be posted as a back-dated transaction</p>
                 )}
               </div>
               <div>
