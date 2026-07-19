@@ -534,7 +534,21 @@ async def get_loan_officers_performance(
             query = query.filter(LoanApplication.created_at <= end_date)
 
         apps = query.all()
-        if not apps:
+
+        # Savings total for this officer's customers, independent of whether they have loans
+        officer_customer_ids = [
+            u.id for u in db.query(User.id).filter(
+                User.assigned_officer_id == officer.id,
+                User.role == "customer"
+            ).all()
+        ]
+        total_savings = 0.0
+        if officer_customer_ids:
+            total_savings = db.query(func.sum(Savings.balance)).filter(
+                Savings.user_id.in_(officer_customer_ids)
+            ).scalar() or 0.0
+
+        if not apps and not total_savings:
             continue
 
         disbursed = [a for a in apps if a.status == "disbursed"]
@@ -563,11 +577,41 @@ async def get_loan_officers_performance(
             "disbursed_applications": len(disbursed),
             "approval_rate": (len(approved) / len(apps) * 100) if apps else 0,
             "total_disbursed": total_disbursed,
+            "total_savings": total_savings,
             "defaults_count": defaults,
             "default_rate": (defaults / len(disbursed) * 100) if disbursed else 0,
         })
 
     return performance_data
+
+
+@router.get("/fixed-deposits-list")
+async def get_fixed_deposits_list(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Unattributed list of fixed deposits for display alongside officer performance.
+    Fixed deposits are not currently linked to a User/customer record, so these
+    cannot be broken down per loan officer.
+    """
+    if current_user.role not in ["manager", "ceo", "admin"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    deposits = db.query(FixedDeposit).filter(FixedDeposit.status == "active").order_by(
+        FixedDeposit.amount.desc()
+    ).all()
+
+    total = sum(d.amount for d in deposits)
+
+    return {
+        "total_amount": total,
+        "count": len(deposits),
+        "deposits": [
+            {"id": d.id, "depositor_name": d.depositor_name, "amount": d.amount, "status": d.status}
+            for d in deposits
+        ]
+    }
 
 
 @router.get("/revenue-vs-expenses")

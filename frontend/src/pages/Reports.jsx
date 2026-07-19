@@ -10,7 +10,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer
 } from 'recharts'
-import { BarChart3, Users as UsersIcon, DollarSign, TrendingUp, TrendingDown, Download, FileSpreadsheet, X } from 'lucide-react'
+import { BarChart3, Users as UsersIcon, DollarSign, TrendingUp, TrendingDown, Download, FileSpreadsheet, X, Building } from 'lucide-react'
 
 const COLORS = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#8b5cf6', '#06b6d4']
 
@@ -29,10 +29,11 @@ export default function Reports() {
 
   // Officers Performance data
   const [performanceData, setPerformanceData] = useState([])
-  
+  const [fixedDeposits, setFixedDeposits] = useState({ total_amount: 0, count: 0, deposits: [] })
+
   // Revenue vs Expenses data
   const [revenueExpensesData, setRevenueExpensesData] = useState(null)
-  
+
   // Date filters
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -80,11 +81,12 @@ export default function Reports() {
       loadReports()
     } else if (activeTab === 'officers') {
       fetchOfficersPerformance()
+      fetchFixedDeposits()
     } else if (activeTab === 'revenue') {
       fetchRevenueExpenses()
     }
   }, [activeTab, activeFilter, selectedMonth, selectedOfficer, startDate, endDate])
-  
+
   const loadReports = async () => {
     setLoading(true)
     try {
@@ -109,13 +111,22 @@ export default function Reports() {
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
       if (selectedOfficer) params.append('officer_id', selectedOfficer)
-      
+
       const response = await api.get(`/stats/loan-officers-performance?${params}`)
       setPerformanceData(response.data)
     } catch (error) {
       console.error('Error fetching performance:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchFixedDeposits = async () => {
+    try {
+      const response = await api.get('/stats/fixed-deposits-list')
+      setFixedDeposits(response.data)
+    } catch (error) {
+      console.error('Error fetching fixed deposits:', error)
     }
   }
 
@@ -126,7 +137,7 @@ export default function Reports() {
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
       if (selectedOfficer) params.append('officer_id', selectedOfficer)
-      
+
       const response = await api.get(`/stats/revenue-vs-expenses?${params}`)
       setRevenueExpensesData(response.data)
     } catch (error) {
@@ -149,19 +160,19 @@ export default function Reports() {
     setExporting(true)
     try {
       const blob = await exportReport(selectedReportType, exportStartDate, exportEndDate)
-      
+
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      
+
       const reportName = reportTypes.find(r => r.value === selectedReportType)?.label.replace(/ /g, '_')
       a.download = `PRIMA_${reportName}_${new Date().toISOString().split('T')[0]}.xlsx`
-      
+
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
-      
+
       toast.success('Report exported!')
       setShowExportModal(false)
     } catch (error) {
@@ -238,7 +249,7 @@ export default function Reports() {
     <Layout>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold dark:text-white">Reports & Analytics</h2>
-        
+
         <button
           onClick={() => setShowExportModal(true)}
           className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
@@ -276,9 +287,9 @@ export default function Reports() {
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <FileSpreadsheet 
-                          className={selectedReportType === report.value ? 'text-blue-600' : 'text-gray-400'} 
-                          size={20} 
+                        <FileSpreadsheet
+                          className={selectedReportType === report.value ? 'text-blue-600' : 'text-gray-400'}
+                          size={20}
                         />
                         <div>
                           <div className={`font-medium ${selectedReportType === report.value ? 'text-blue-600' : 'dark:text-white'}`}>
@@ -449,7 +460,7 @@ export default function Reports() {
                 </select>
               </div>
             )}
-            
+
             <div className="flex-1 min-w-[200px]">
               <label className="block text-sm font-medium mb-2 dark:text-gray-300">Start Date</label>
               <input
@@ -605,36 +616,78 @@ export default function Reports() {
           )}
 
           {activeTab === 'officers' && (
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border dark:border-gray-700">
-              <h3 className="text-lg font-semibold mb-4 dark:text-white">Officer Performance</h3>
-              {performanceData.length === 0 ? (
-                <p className="text-gray-500 dark:text-gray-400 text-center py-10">No data</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b dark:border-gray-700">
-                        <th className="text-left p-3 text-sm font-semibold dark:text-white">Officer</th>
-                        <th className="text-right p-3 text-sm font-semibold dark:text-white">Apps</th>
-                        <th className="text-right p-3 text-sm font-semibold dark:text-white">Approved</th>
-                        <th className="text-right p-3 text-sm font-semibold dark:text-white">Rate</th>
-                        <th className="text-right p-3 text-sm font-semibold dark:text-white">Disbursed</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {performanceData.map((officer) => (
-                        <tr key={officer.officer_id} className="border-b dark:border-gray-700">
-                          <td className="p-3 dark:text-white">{officer.officer_name}</td>
-                          <td className="text-right p-3 dark:text-gray-300">{officer.total_applications}</td>
-                          <td className="text-right p-3 dark:text-gray-300">{officer.approved_applications}</td>
-                          <td className="text-right p-3 text-green-600 dark:text-green-400">{formatPercent(officer.approval_rate)}</td>
-                          <td className="text-right p-3 dark:text-gray-300">{formatCurrency(officer.total_disbursed)}</td>
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border dark:border-gray-700">
+                <h3 className="text-lg font-semibold mb-4 dark:text-white">Officer Performance</h3>
+                {performanceData.length === 0 ? (
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-10">No data</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b dark:border-gray-700">
+                          <th className="text-left p-3 text-sm font-semibold dark:text-white">Officer</th>
+                          <th className="text-right p-3 text-sm font-semibold dark:text-white">Apps</th>
+                          <th className="text-right p-3 text-sm font-semibold dark:text-white">Approved</th>
+                          <th className="text-right p-3 text-sm font-semibold dark:text-white">Rate</th>
+                          <th className="text-right p-3 text-sm font-semibold dark:text-white">Disbursed (Loans)</th>
+                          <th className="text-right p-3 text-sm font-semibold dark:text-white">Savings</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {performanceData.map((officer) => (
+                          <tr key={officer.officer_id} className="border-b dark:border-gray-700">
+                            <td className="p-3 dark:text-white">{officer.officer_name}</td>
+                            <td className="text-right p-3 dark:text-gray-300">{officer.total_applications}</td>
+                            <td className="text-right p-3 dark:text-gray-300">{officer.approved_applications}</td>
+                            <td className="text-right p-3 text-green-600 dark:text-green-400">{formatPercent(officer.approval_rate)}</td>
+                            <td className="text-right p-3 dark:text-gray-300">{formatCurrency(officer.total_disbursed)}</td>
+                            <td className="text-right p-3 text-blue-600 dark:text-blue-400">{formatCurrency(officer.total_savings)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Fixed Deposits — unattributed, shown separately since they aren't linked to a customer/officer yet */}
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border dark:border-gray-700">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-lg font-semibold dark:text-white flex items-center gap-2">
+                    <Building size={18} className="text-indigo-500" />
+                    Fixed Deposits (All Officers)
+                  </h3>
+                  <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
+                    {formatCurrency(fixedDeposits.total_amount)} across {fixedDeposits.count} deposit(s)
+                  </p>
                 </div>
-              )}
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                  Fixed deposits aren't currently linked to a customer record, so they can't be broken down per loan officer.
+                </p>
+                {fixedDeposits.deposits.length === 0 ? (
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-6">No active fixed deposits</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b dark:border-gray-700">
+                          <th className="text-left p-3 font-semibold dark:text-white">Depositor</th>
+                          <th className="text-right p-3 font-semibold dark:text-white">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {fixedDeposits.deposits.map((d) => (
+                          <tr key={d.id} className="border-b dark:border-gray-700">
+                            <td className="p-3 dark:text-white">{d.depositor_name}</td>
+                            <td className="text-right p-3 dark:text-gray-300">{formatCurrency(d.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
