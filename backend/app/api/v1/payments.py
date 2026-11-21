@@ -43,25 +43,41 @@ def create_payment(
         if loan.assigned_officer_id != current_user.id:
             raise HTTPException(status_code=403, detail="Access denied - loan not assigned to you")
 
-    # Savings account deduction
-    if payment.payment_method == "savings_account":
-        from app.models.savings import Savings
-        savings = db.query(Savings).filter(Savings.user_id == loan.customer_id).first()
-        if not savings:
-            raise HTTPException(status_code=400, detail="Customer has no savings account")
-        if savings.balance < payment.amount:
-            raise HTTPException(status_code=400, detail=f"Insufficient savings balance. Available: ₦{savings.balance:,.2f}")
-        savings.balance -= payment.amount
-        db.add(savings)
-
-    # Parse payment date — use provided date or default to now
-    if hasattr(payment, 'payment_date') and payment.payment_date:
+    # Parse payment date first — use provided date or default to now
+    if getattr(payment, 'payment_date', None):
         try:
             payment_dt = datetime.strptime(payment.payment_date, "%Y-%m-%d")
         except ValueError:
             payment_dt = datetime.utcnow()
     else:
         payment_dt = datetime.utcnow()
+
+    # Savings account deduction. This is posted as a withdrawal in the savings ledger,
+    # so the customer's balance and transaction history always agree. (Changing
+    # savings.balance directly would be undone the next time the balance is rebuilt
+    # from the history.)
+    if payment.payment_method == "savings_account":
+        from app.models.savings_transaction import SavingsTransaction
+        from app.api.v1.savings import _lock_savings, _recompute_balances
+
+        if payment.amount <= 0:
+            raise HTTPException(status_code=400, detail="Amount must be positive")
+
+        savings = _lock_savings(db, loan.customer_id)
+        if round(savings.balance or 0.0, 2) < payment.amount:
+            raise HTTPException(status_code=400, detail=f"Insufficient savings balance. Available: ₦{savings.balance:,.2f}")
+
+        db.add(SavingsTransaction(
+            user_id=loan.customer_id,
+            type="withdraw",
+            amount=payment.amount,
+            balance_after=0.0,  # placeholder, corrected by recompute below
+            note=f"Loan repayment - {loan.application_number}",
+            transaction_date=payment_dt,
+            created_by_id=current_user.id
+        ))
+        db.flush()
+        _recompute_balances(db, loan.customer_id, guard_from=payment_dt)
 
     db_payment = Payment(
         loan_application_id=payment.loan_application_id,

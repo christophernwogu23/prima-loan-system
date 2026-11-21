@@ -604,3 +604,6 @@ def generate_shares_report(db: Session, start_date: Optional[str], end_date: Opt
         ws.column_dimensions[col].width = 18
     
     return create_download_response(wb, "Shares")
+
+from app.api.v1.loan_balances import router as loan_balances_router
+router.include_router(loan_balances_router)

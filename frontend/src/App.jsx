@@ -30,7 +30,7 @@ import JournalEntries from './pages/gl/JournalEntries'
 import AccountDetail from './pages/gl/AccountDetail'
 import OfferLetter from './pages/loans/OfferLetter'
 import UpfrontCharges from './pages/loans/UpfrontCharges'
-
+import LoanBalances from './pages/accounts/LoanBalances'
 
 
 
@@ -74,6 +74,7 @@ export default function App() {
           <Route path="/gl/accounts/:accountId" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
           <Route path="/applications/:id/offer-letter" element={<OfferLetter />} />
           <Route path="/upfront" element={<ProtectedRoute><UpfrontCharges /></ProtectedRoute>} />
+          <Route path="/accounts/loan-balances" element={<ProtectedRoute><LoanBalances /></ProtectedRoute>} />
 
                     
         </Routes>

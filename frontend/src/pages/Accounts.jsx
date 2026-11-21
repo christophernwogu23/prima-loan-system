@@ -9,7 +9,8 @@ import {
   HelpCircle,
   TrendingUp,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  ClipboardList
 } from 'lucide-react'
 import client from '../api/client'
 
@@ -64,6 +65,17 @@ export default function Accounts() {
         { label: 'Total Disbursed', value: formatCurrency(stats.loans.total_disbursed) },
         { label: 'Total Repaid', value: formatCurrency(stats.loans.total_repaid) },
       ]
+    },
+    {
+      id: 'loan-balances',
+      title: 'Loan Balances',
+      description: 'What each customer still owes on their loans',
+      icon: ClipboardList,
+      iconColor: 'text-indigo-600 dark:text-indigo-400',
+      bgColor: 'bg-indigo-50 dark:bg-indigo-900/20',
+      borderColor: 'border-indigo-200 dark:border-indigo-800',
+      path: '/accounts/loan-balances',
+      stats: []
     },
     {
       id: 'savings',
@@ -158,18 +170,20 @@ export default function Accounts() {
                     {account.description}
                   </p>
 
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
-                    {account.stats.map((stat, index) => (
-                      <div key={index} className="flex justify-between items-center">
-                        <span className={`text-sm ${stat.highlight ? 'font-medium' : ''} text-gray-600 dark:text-gray-400`}>
-                          {stat.label}
-                        </span>
-                        <span className={`${stat.highlight ? 'text-lg font-bold' : 'text-base font-semibold'} ${stat.highlight ? account.iconColor : 'dark:text-white'}`}>
-                          {stat.value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  {account.stats.length > 0 && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+                      {account.stats.map((stat, index) => (
+                        <div key={index} className="flex justify-between items-center">
+                          <span className={`text-sm ${stat.highlight ? 'font-medium' : ''} text-gray-600 dark:text-gray-400`}>
+                            {stat.label}
+                          </span>
+                          <span className={`${stat.highlight ? 'text-lg font-bold' : 'text-base font-semibold'} ${stat.highlight ? account.iconColor : 'dark:text-white'}`}>
+                            {stat.value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )
             })}
